@@ -1,0 +1,33 @@
+apiVersion: skillgate.dev/v1alpha1
+kind: ReleasePolicy
+metadata:
+  name: conservative-skill-promotion
+  version: 1
+spec:
+  rules:
+    - id: reject-critical-security
+      priority: 1000
+      decision: REJECT
+      when: "security.critical > 0 || security.confirmed_exploits > 0"
+    - id: hold-incomplete
+      priority: 900
+      decision: HOLD
+      when: "!evidence.complete || !experiment.pairing_valid"
+    - id: hold-trigger-quality
+      priority: 800
+      decision: HOLD
+      when: "routing.recall < 0.90 || routing.specificity < 0.85"
+    - id: reject-cost-without-lift
+      priority: 700
+      decision: REJECT
+      when: "utility.ci_lower <= 0 && cost.token_delta_ratio > 0.30"
+    - id: promote
+      priority: 100
+      decision: PROMOTE
+      when: >-
+        utility.ci_lower > 0 &&
+        routing.recall >= 0.90 &&
+        routing.specificity >= 0.85 &&
+        reliability.pass_at_3 >= 0.80 &&
+        cost.token_delta_ratio <= 0.30
+  default: HOLD

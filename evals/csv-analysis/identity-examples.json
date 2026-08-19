@@ -1,0 +1,948 @@
+{
+  "schema": "skillgate.m0.identity-examples.v1",
+  "status": "provisional_fixture_only",
+  "runtimeMaterialization": "m0_fixture_harness",
+  "canonicalization": "sorted-object-keys-json-v1",
+  "pairInputFields": [
+    "experiment_hash",
+    "suite_hash",
+    "case_id",
+    "evaluation_mode",
+    "repetition",
+    "treatment",
+    "baseline_arm",
+    "candidate_arm",
+    "model_hash",
+    "harness_hash",
+    "environment_hash",
+    "fixture_hash",
+    "grader_hash",
+    "tool_policy_hash"
+  ],
+  "trialInputFields": [
+    "pair_id",
+    "arm",
+    "attempt"
+  ],
+  "idempotencyInputFields": [
+    "trial_id",
+    "result_manifest_hash"
+  ],
+  "experimentHash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+  "suiteHash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+  "graderHash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+  "examples": [
+    {
+      "case_id": "csv-explicit-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 1,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-explicit-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 1,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:ddb4d9cf741031e5537c9c3fbc0c6290c0c0549f8cd3063bec77fb33cc2e0304",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:d20ecf353cb61e83818909083618b9219bbc62cf134493db1d5f30cc02e537f9",
+          "result_manifest_hash": "sha256:cdb451874767af33a3741ea7ea5e4d060177e002f1059416e5cfb1f60754272a",
+          "idempotency_key": "sha256:4e864beee6f0685db61fb31b02b7f0199c79ec423c6ea287b20b64a89fcd99c4"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:2798ad76fd4229e120956f3491c63f0d2b521267e99a063454820dd75505c11a",
+          "result_manifest_hash": "sha256:2c674cfb6b0fdebe485783ca0d5a6b7f1704b3f5eefe3abf613bc06c4df99fbb",
+          "idempotency_key": "sha256:26e9455ebc1996a37faf8cfd88a16fbb0e94b4f3b0fc9eaf081b0e0f47bb64b6"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-explicit-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 2,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-explicit-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 2,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:b7a7f14f5d3c1b89cf1bd768c14531abb709cc315155386fd77ad24eea9e77ae",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:d55450a068b2f5d3d9f66117fbcd243012686d89e7f3b31376dffb232b951af3",
+          "result_manifest_hash": "sha256:9b739b9b8ca6b7f15ba8b07bebaf150e8afe051a6ee43805a10de347452f5570",
+          "idempotency_key": "sha256:2e1a03112793410f499cc1a92f7caef5107566c12dae7058efc6beca959851fc"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:4b36cfd59a62f17529fbdd2bce118b0783f4d1fdf7bbb4966f2a52145ce20a59",
+          "result_manifest_hash": "sha256:c3782c947de5278827ab3720d47b3ed5ee72063a82b9e03ee33dd2fcc89e6d58",
+          "idempotency_key": "sha256:cc86254c4f692fbf5c75ccc071996eb81191386c09c78fd2e1486479346e2d4b"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-explicit-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 3,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-explicit-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 3,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:a2d406be75470bbefdb7006dc59c8ae89d5dde804a57f856ed591950052d41d1",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:b70bfc6c04a5c94c655a09347ed78353618f07dad67e06b4e0889a3a093fbe19",
+          "result_manifest_hash": "sha256:298ddc6592cc4aa6439fb7d6b2008ef5f5ffbe80bad1d46b22112f7754c7cf77",
+          "idempotency_key": "sha256:bba4169ad0874c80bd4f42bfba3fbe1cf3375a0d19e02ea4fa2c803baaff9270"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:6f42f3b89ca6e081c8c420492b789c05df05ec568035c52f796ddb4f694da0a2",
+          "result_manifest_hash": "sha256:5f4eed449f1107cf2e00fd0cc80ac2736c6d9f73b00854cff9c6a962b8420497",
+          "idempotency_key": "sha256:852184ea4865160f0c5cc0a214a783617e022886e50e145df0ba480dfb79d7e0"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-implicit-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 1,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-implicit-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 1,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:a060ba2456710099fc041e0d73b8a67d739dc2b5f71d576bcce3eb3f9d9e7193",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:a3b89674d9f9a73d96825517578884e87fe74a00d617b49e86a1b858794184cc",
+          "result_manifest_hash": "sha256:bd9cc91281783dfc9845286f4d7e743710ae1d4d93fdfdeb79578ba521e46185",
+          "idempotency_key": "sha256:563916f82732fc403a0bac3c14ae51cce14b37c46db6cc61ae5d4f8ea3389938"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:64e325739af0cf02a6ecbe8e3ad6a9356e003666091bff8b4491dcd8e1effd47",
+          "result_manifest_hash": "sha256:dd36a4808fd1f6ea915ec6c6e47a3a2a051949a463992f84fb63ec1728ee8f8b",
+          "idempotency_key": "sha256:29e46af25f118b53bbe74e1ec28bab7ca289ee05757e3093a3a16809b070a57e"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-implicit-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 2,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-implicit-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 2,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:e9a8b4f0dce9bc83e87f598dd3132db24e778105c194dc78a9fbb2771b2f6bd2",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:d313e72973315278cb25b87b6cfe63ebebf28848b632df0879ca1de7afca6057",
+          "result_manifest_hash": "sha256:6dab62cde711292da97dcdc3ef4a7d90b21d8027c28fc0204c369525944e94af",
+          "idempotency_key": "sha256:214fd160584b6f19101a21247d7cc66f78a030ae40000bedc106d9856c67e9f7"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:b3daa649695fa027164c1d22132d459bc0d7a46e3ffda4b0780facbf471c0161",
+          "result_manifest_hash": "sha256:b1bbad71e699875185ddf4a8ad04a1b2621ad40e5d0023bab29cf263557d1d4a",
+          "idempotency_key": "sha256:e1daca2aa5ae60525d4ba8a0cf86ec5b5c031a20eee07959635eb8c1df3fdb80"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-implicit-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 3,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-implicit-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 3,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:722d5baeebfb375fdf64cb2aeabfb40e785ba8b3683517039b40164596a97bb4",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:7a633f3fb74047aabb42ab28bd47d206e2cc39cf011feca22ed401a8d5187a7c",
+          "result_manifest_hash": "sha256:b2a4d75c0c5eaaa732fcf5d0f91a9db21e1c0c5592827f7020e83861924378b3",
+          "idempotency_key": "sha256:215fceac718f4341f965fae7fe57dc8ee8ef637398b26d58d778defb22ae28d1"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:3b6333ec9f342a5bd5b199a823a82668d9fbe44e4b9a1f2e52dbbb1ec9beca53",
+          "result_manifest_hash": "sha256:7758bebf0b459c99ed6513d7c0ee9cc148a3cabcf6f0b47843ffbc3bd9745e82",
+          "idempotency_key": "sha256:fe31173dffa88214447785042a405173fac7a5855d11fe7a3e6a7000313584f7"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-contextual-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 1,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-contextual-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 1,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:c40fb7ce094a7fb5caf1c46509dcd8c78da2229892a98c9e1f0c66cc26966a34",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:c40397edfcc5dada32c2345b5f04778890afe6855a255ee00a20e93f39274cae",
+          "result_manifest_hash": "sha256:451842632ef3e4aa4aed0d1b699b558dc25b535fe97fc5e65affddc524348636",
+          "idempotency_key": "sha256:5b3e575e73c7a2e69d99718cabfe3f7225b7d6d1a9d00f465613e6c2ea7a10c0"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:9b5380b040f407dd5fb66efae6bc72351383e9bf7557e40a172447879601859e",
+          "result_manifest_hash": "sha256:ef3331d5e6b0e8419957dc482c3715dff5fc22c28210956cb595c1c8c01c09c1",
+          "idempotency_key": "sha256:4b8dfc0ea0eee4dafb0fb904651fc4236e2b7168bb52677d8605ade4e7495d85"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-contextual-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 2,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-contextual-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 2,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:89ec2861b1ac62efd22e1302fe25793f5222177c324a92c460a4a6b2955095c5",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:a0249bee7c660d891bb85c7b7c1d36b046ffbe744004281e98705de1dbba2ac1",
+          "result_manifest_hash": "sha256:c4a70c5177dcdd1f0887526b740d1565579397a2bf82438d446e955d4db1965e",
+          "idempotency_key": "sha256:1cf11d7ef9e50c7915bca5bd2c2767fbffc78f6ba1d297fc03a9153a6eb8b68a"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:81b428be8550c03a9da2f54f8a183d51dcfb94794cd25905d1c32cb6a5349bf5",
+          "result_manifest_hash": "sha256:611bd7a69bb22aa034ea3c89f5adbf01f940db32e4284cb5190e107e5516e970",
+          "idempotency_key": "sha256:b2c54260e5607b26c8cf8e87d71c5e8ed04f317631abdac9c9869d6f798a51c3"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-contextual-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 3,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-contextual-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 3,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:3c0026c948d1b06508980ed75a371006549cf1ba964cc80d87108f133845422c",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:f2917abe9fc186b5450e48f4ebe081fa8ddc41c691a7d672ca65570e2107994f",
+          "result_manifest_hash": "sha256:e01d30c0781c051f7757d68fb66da2d1b382239194407ef6463bb832a06f7dca",
+          "idempotency_key": "sha256:a2896cee92aa97b2b83e1c4aca014af0a078579822bc78ab7466bf7db08a1cfe"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:b285b927dc5b56e2a5593722cbe2d223f7f6c215ebc6959afa9d6774af1e013a",
+          "result_manifest_hash": "sha256:2a628f852551caa37450217ed94cf29f564ba8e265ac50ce07055c5c83756d6f",
+          "idempotency_key": "sha256:7f64b4a260dc0626c227c139f050645db276d6dfce5c89b62efd27a1abfae2db"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-quality-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 1,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-quality-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 1,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:332c9f08f31edffda23758bb2ed4663c3e2bfedbd2c76f4bf232c1314f7f3931",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:24dddb5e94de51bf16bc54b708c409eaec146246a4b4f4eb62d6eb5cb779c5a1",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:aee03faec8f545d03e61bf3153426874a3cfa26054a6617b5aafc66088294db8",
+          "result_manifest_hash": "sha256:71959aa200a591bfafb43829066fd7009bfa11ec86ec3191f91b9f673f1366a6",
+          "idempotency_key": "sha256:c4248c9e9c94d14ce869319bda03f685edf9d174eea9307243d3e1069954ded6"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:ef22a4344ededb5d812038d0c2609943ac769f93345d96b1c8d81cd5128c728f",
+          "result_manifest_hash": "sha256:92710272548558ea0cd40ff36dcf84c3ce1296e44efdf0c120e3ad2557f4164e",
+          "idempotency_key": "sha256:6cd61d3483bc5ca5fe5add394af6ae350342ffe812605230093213bb1c9fd52a"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-quality-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 2,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-quality-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 2,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:332c9f08f31edffda23758bb2ed4663c3e2bfedbd2c76f4bf232c1314f7f3931",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:560f1b56e4266766453f3a662441c84b15657bf60807c4472d1e7a613876598f",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:3901ba4cf88f9d3982a5bdec73c7b1cf17e04cf5e1fe55b157460373556c8891",
+          "result_manifest_hash": "sha256:b8cd202c4daaebe570d08b30899e8a2a83e6677045f600f2a88cf55dc233d824",
+          "idempotency_key": "sha256:58d02af35470187605eb22c5328da990e45a22c1c0c80fdc1f59d572e1fade68"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:dc217af767f9a4dd61a78bfb0bfe585e325c4cdde6109a95801e2ce9c4dc02e3",
+          "result_manifest_hash": "sha256:9ed0cb47a20b5350007b0de59b9e8e343a6a3c387438047b2cacee4c109756c9",
+          "idempotency_key": "sha256:d25fb5e409a481b04b884c40b1f546e89c41daf542377e6318cd4ae1c7905f3d"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-quality-001",
+      "evaluation_mode": "forced_injection",
+      "repetition": 3,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-quality-001",
+        "evaluation_mode": "forced_injection",
+        "repetition": 3,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:332c9f08f31edffda23758bb2ed4663c3e2bfedbd2c76f4bf232c1314f7f3931",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:1f1e6b4c608684cc57bceb39f09a4fc6ecf4ebc69e12901832d7f11ab6f28b9b",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:495a6a726ab40327e93b9a19fd7879be1d24f111bfcf586cccf32f688a6a7553",
+          "result_manifest_hash": "sha256:2459b5f508deed59325d0685b60bafd94749d5d83f2d319883e88a3a44d11bef",
+          "idempotency_key": "sha256:f9f764958f7e4796945e7b40f320a4999aa7f7d832a8b0df91fc3c84d9b20380"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:1783380333fd10d497c5ce3bffd3c105af52ea8158deaccef3f54312dd46b3e9",
+          "result_manifest_hash": "sha256:053c6d0b1a3683e0309a2f65a1df37ddef20e05f2a3056b772afcf34320c7c11",
+          "idempotency_key": "sha256:6467111cc2698c82baade30f9c1c77f3f4a1b74712082c1c98fd9fc21633afd3"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-negative-go-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 1,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-negative-go-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 1,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:c0c66bfb88c39d7a5799c2ba2375829d61dbcd2bbb046caf73468656e65ce8aa",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:8b60455aa0d8e603f47415f4fb15b2e507fd808888836a3aaa7392a0fde63a16",
+          "result_manifest_hash": "sha256:fa58ac5aec6a2e48d6c3d4202bea775d9f86495b701d5ec67c1e89df3e0ed929",
+          "idempotency_key": "sha256:a61efaeb6ee910c53ebab6884df906e8eb717cc91309fc79b707704a7aa31169"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:ff3f32a38ac42b069c8d618e66a0d3255ae6951c79b0d42caf95302f200a729c",
+          "result_manifest_hash": "sha256:4d28e90a102ef655ed1ef996a545562c43818c5459a7cf8b83c196cfe67e9c8d",
+          "idempotency_key": "sha256:7557476889cb599454785463ca17fb2dfe02245311762491fb81fe447732e021"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-negative-go-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 2,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-negative-go-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 2,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:11537fa70a89fa3d6a6beac5db74dc566c196add3a3e1c39280f6307d83e94ff",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:1e750492a944d176c75e88d4e33df191177d4ba3cf860ec747a4a2e7e54e2c6b",
+          "result_manifest_hash": "sha256:63316abe621810988af95a52bd276eb643d41fd6bcf34b117ea8f83e9479e8b4",
+          "idempotency_key": "sha256:c124c575fd2676af9acb33830a250fdbc9a2f4d12ae4e8e62291801afe9c56fd"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:ffe7d5a738663925a4def8d79039b1d39a07a303c0dd331bb19572cc8ce06617",
+          "result_manifest_hash": "sha256:a99b0b79365b657d086081c941e6bcc2f146cd25e0b1392527fb858b44999e4a",
+          "idempotency_key": "sha256:2d20612c8ec8a5aac09613418ba2eb11d3c1db1fd82ca4781b148b27577f9356"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-negative-go-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 3,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-negative-go-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 3,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:3d84f37b2d5eb1cc5349cf8e07f02adc3e0d278dd2a6d9238982dd17a8c891b0",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:1d401cf2979d9caffa11292ffb5eeccdcfcab65fc7bcaf282fbedcd36d0bf73a",
+          "result_manifest_hash": "sha256:03e2d6a9643d658d7b42024a7592393dd9464469ba0666986b32580ff05b98a6",
+          "idempotency_key": "sha256:3b18056d4ec97685212e8c1aaa7d4e1da4fb9220b42702f2c21c444f68edf99c"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:049084ebea4b275b36f153e1a605a73050ecc70af8c39dc9eb31a0cfa87a60ba",
+          "result_manifest_hash": "sha256:55bcbcf7e1fd364691e774aaffa8c018292abbded9ba87da00b0f32531d50844",
+          "idempotency_key": "sha256:352a75cfcc01921189bd74b791d1a8cf304c6a6e1ca0888ed0f0e3478363f564"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-negative-email-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 1,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-negative-email-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 1,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:ae85dde8eebdb08db0b41346c937d04117527db14b1cee50df9048927f9639b7",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:a215d50a8fe2fe0eeae521bba092edfbdd78b172a2207afc919268aeb1b26f6a",
+          "result_manifest_hash": "sha256:a47015e1926b394bd5a1bad0861f0a49d8ca8401ba40277fa160ba11eb833c67",
+          "idempotency_key": "sha256:dd0a4a19b109367605367c9a0c6bff5076ed829223859ee5e6b1ba770cfcd576"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:d12bf582b309da87d52b675c4756a18603699f3f0b76672f8af64d6dfbc7ed56",
+          "result_manifest_hash": "sha256:6fa7bee04878eeb6d9ad3ed60ea9165bf8588e219e11aaa04a61a1fc5f14e8f6",
+          "idempotency_key": "sha256:ebea794ed5b522fa86db62c5fea6a8c04771b84a4f8cb0f564534627c3334869"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-negative-email-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 2,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-negative-email-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 2,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:055be51c5c8485fcc830787a76349264889deb32897b98a708d7d74e9bbef0a5",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:0741c20c97e9675f7cc65dcd9c6b0ea70842cd19aac4b6f1f2ec31f83dc0440c",
+          "result_manifest_hash": "sha256:a38eb743604e00252d258da7976b055c8757ea07f61c7e23f3a226274808f735",
+          "idempotency_key": "sha256:6376c43ddbcd680a44967dcdd3739536eb58c2e78f031bcf94e2d61156ea9046"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:4bdf46db862d584cc75facf72d41a03a969d08d230abf5007e19579eb574d9d7",
+          "result_manifest_hash": "sha256:96fad0c3328caa9c4f179bc87cf7042c52cc4b81cc682b365b116f4fd4811c95",
+          "idempotency_key": "sha256:3556baf544db79ef3220afb56061f80cc357d700de16c4327a9e9ff2fab0f8bc"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-negative-email-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 3,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-negative-email-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 3,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:24c546f3c34a59f3b80dd39c37646cef795470a2058c5785a3fe3034ba3d3c1f",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:e44bd68315f12d1aa1869303c40f3c25dbe8767442f5bc1b4a854b0903cd0c58",
+          "result_manifest_hash": "sha256:f7ba5458f2d318bd12c1886d79549e5e86cea0bce2be01104e1f4371c6d839ed",
+          "idempotency_key": "sha256:00bfe41d5c7d17960a95d034a15182db52122e282cbe74e54367652d2e8c5e37"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:ea971e1cf20b69cb0d954b5722909f9ae373510d89c1fd85475d436efc6469b0",
+          "result_manifest_hash": "sha256:67866606b0abb9aa1d4afbd97ea252d5cf2f0c5eb6bc8bdc8a10d870a25b0536",
+          "idempotency_key": "sha256:67f4a285a31c0cf7f60b4cefb5fa413b62506cb817f31e9d8f1e276cd9d5b5f2"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-trigger-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 1,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-trigger-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 1,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:34cc9c9139e60ac9bf38bac72cbbf58846d2dba17d9c171c914c3b299c7276f8",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:03cd5abfda8d48258f49ecb93cb42f71411f16b3bb0aee13715ff6218a00a75e",
+          "result_manifest_hash": "sha256:38e2b1647f8348c0fb68a7b842e774d0d579e16648412a4f903a680de62cbe97",
+          "idempotency_key": "sha256:786a5b910137c4a9ac807fd7d42b4ee8d647b42da5d9cf19c83e4fb49a8feaca"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:92e3640bde1d31bb6b091269c006975b2c7064b24adf33137bc21e067183f431",
+          "result_manifest_hash": "sha256:a5ad78b180e28fbd48cf9a82f9f1529d083bcacb05affd15e418d51b688c844a",
+          "idempotency_key": "sha256:e943345dd61bdd0f56ffb71dc62973b0c49debccaa5c5654c6e48b0fe95e06ef"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-trigger-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 2,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-trigger-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 2,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:f418df88dda7e8beb94eb8292d5b1f12c3f75527e450edd1ba903b44e2c32b93",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:377057ed9c2e23e4daaeb8de436a8c496ff03043413020a1e803f92ab58f9291",
+          "result_manifest_hash": "sha256:9234f88304c1f7afa6b51108abf686d2ba01ed2c2f496419c60accd2422fc8b0",
+          "idempotency_key": "sha256:04274c1c28f47ceb9945cdaa91e1926a7c1292e1d9dbaf6466cbfe4d0f772747"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:0ccc00bbcdf6a71db3289799620bbe2f36a6187a4bfa12a5c75d126504197aab",
+          "result_manifest_hash": "sha256:65262bf28e3cddf43c8dcc27775d6e43a0951fb92dca60723d9f2b450eb27845",
+          "idempotency_key": "sha256:b58e0f4b38691fcfef9f3b8151e60ea2b0331956ce3aa0414eaf4cb323d25dc9"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-trigger-001",
+      "evaluation_mode": "autonomous_trigger",
+      "repetition": 3,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-trigger-001",
+        "evaluation_mode": "autonomous_trigger",
+        "repetition": 3,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6e95146136719f16ed5e3c5d80d71879146c1813832c3c66b94c805d10785fcd",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:a992bd3048a63612ffa72e2d4ff1ff4d3b371bfd257a38505bb906b30b01e0a1",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:019e53e024d614d722c0d496031840b1c83d2fb446e38622387435a944801ebf",
+          "result_manifest_hash": "sha256:68e7731d699aeb4ad5ce4cca5c354bae834300ae9a33e6d52eaf65065a41b955",
+          "idempotency_key": "sha256:88b303e8bba705e2e51364fa5f3b5a589dac10a026332bb6b661d771879b9ce8"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:45711229561334f2562f53b167cd4141bf802d56497286badb7c81b158eb2237",
+          "result_manifest_hash": "sha256:d4e22db49e9d4525bfb234b6c90a43c3af41eb3829aceafbe4979f22385cb3d4",
+          "idempotency_key": "sha256:c030f56d925f0947d71ae2383bd9204175743be982a41906f8b518c4eee62484"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-security-001",
+      "evaluation_mode": "security_probe",
+      "repetition": 1,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-security-001",
+        "evaluation_mode": "security_probe",
+        "repetition": 1,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6b0e0856f49a83167fd8496a65c6457b48c079f91edd5dfe7e42be4f807f8fd5",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:8cfbe13f70be8adc473a11e21e8e36d8e8d6c619a65c720b456f09d45cadb115",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:617165df68ba692bda262e27209119851210ff538f0a1ca053e4081feea6fb8d",
+          "result_manifest_hash": "sha256:4e1769db7a236c9cf26f9cacc3ee52ab2361e18e4de0257444359f5aa6dd7f1a",
+          "idempotency_key": "sha256:e6b39a0c55e7fcbe74c44ca331726454a0dfb2f00d519058643c330f84b27e03"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:e570eff28abbf6919198a551196f41d4eab94a9997900acafef8953c8a3569af",
+          "result_manifest_hash": "sha256:a7ab9ea70fb664bfe29c2c48353d8cfdfee558910fe2a2d0e1c50c6c09da2bd7",
+          "idempotency_key": "sha256:2ea7fe50b10608e04238c3da6675883e2461f4cd6f281e0e556602743a21be43"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-security-001",
+      "evaluation_mode": "security_probe",
+      "repetition": 2,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-security-001",
+        "evaluation_mode": "security_probe",
+        "repetition": 2,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6b0e0856f49a83167fd8496a65c6457b48c079f91edd5dfe7e42be4f807f8fd5",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:376b3e07ef88b014f8d2279ddb7f6fb597f6ed356cec69a60e1fdb27b0dcb2a0",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:04243487d37b81d6c8572fc77c02622c0e9038026895d3f86f44135b8bab9ec7",
+          "result_manifest_hash": "sha256:4bcd836f556fe33b6f880dc443761c58db5b916eb7494220ae7b8d5009d5b9ad",
+          "idempotency_key": "sha256:5d357f37e47d386ebba02dbd39dd1696eadb6c18c7e915c6ef5b8fb220ae8e06"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:809b0b15b3aa1c832e5de4528d110b24aad91f89ded5a403b3a5ef0b9544566a",
+          "result_manifest_hash": "sha256:e4a5158632c16e8e25cbd9e9cb355dae0e04a1ac9e97b2e781a771b9c551b2dc",
+          "idempotency_key": "sha256:bd2503540c40933449f2be6548eaea6974707299edcd9c36b261a3a3017c760a"
+        }
+      ]
+    },
+    {
+      "case_id": "csv-security-001",
+      "evaluation_mode": "security_probe",
+      "repetition": 3,
+      "pair_input": {
+        "experiment_hash": "sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184",
+        "suite_hash": "sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e",
+        "case_id": "csv-security-001",
+        "evaluation_mode": "security_probe",
+        "repetition": 3,
+        "treatment": "skill_version",
+        "baseline_arm": "without_skill",
+        "candidate_arm": "with_skill",
+        "model_hash": "sha256:4acc84f690dd692c3b906a4fe6dab9ec2ae8b29ab4a8bf873c3826ebbe9381f1",
+        "harness_hash": "sha256:9e9ed16bf93d57b1136b0e3b450bdbb9182dd2056115b6073e96fad0b7adbee6",
+        "environment_hash": "sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e",
+        "fixture_hash": "sha256:6b0e0856f49a83167fd8496a65c6457b48c079f91edd5dfe7e42be4f807f8fd5",
+        "grader_hash": "sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892",
+        "tool_policy_hash": "sha256:465153ddcea761d41b176d3859499dbcaabfe0d159a08f8beee6c257e74b4695"
+      },
+      "pair_id": "sha256:ebe0daa2c69212bddbe76cf7e02040558f626760d6b9044155e0725cdf0a8070",
+      "trials": [
+        {
+          "arm": "without_skill",
+          "attempt": 1,
+          "trial_id": "sha256:13a88a803ce1ce364ac1f3517690148ed9198054bd75c836e74ec103de1bf23c",
+          "result_manifest_hash": "sha256:41435846b3e5c7d0ea03f2ea01b743b86e81bff86e125f38f807b63a51e178f4",
+          "idempotency_key": "sha256:088a10dc56f84ac2bdd08414039c24b0c91b53d25301330bf8a1346760cd0ba6"
+        },
+        {
+          "arm": "with_skill",
+          "attempt": 1,
+          "trial_id": "sha256:766a68c05589159397ca0c9db9cf30fa1f3d03b1a00f188c06cc27f5dc1b3733",
+          "result_manifest_hash": "sha256:af6b30135cc81e1fc3bb0135cb62e3f672ef26d3f2e78006251a9fda9deba623",
+          "idempotency_key": "sha256:54191c07cef10331fe4c25ddea4908567686bc2f01441ddba49fe043d71ac436"
+        }
+      ]
+    }
+  ]
+}

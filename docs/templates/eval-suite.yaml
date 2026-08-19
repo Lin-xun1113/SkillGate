@@ -1,0 +1,53 @@
+apiVersion: skillgate.dev/v1alpha1
+kind: EvalSuite
+metadata:
+  name: csv-analysis-suite
+  version: 1
+spec:
+  split: tune
+  defaults:
+    repetitions: 3
+    timeoutSeconds: 60
+  cases:
+    - id: csv-explicit-001
+      evaluationMode: forced_injection
+      population: answer
+      type: explicit
+      prompt: "使用 csv-analysis 读取销售数据，生成按月份汇总的 JSON 文件。"
+      fixtures:
+        - path: files/sales.csv
+          sha256: sha256:replace
+      expectedOutcome: "生成可被程序读取的月份汇总 JSON。"
+      assertions:
+        - id: output-file-exists
+          type: file_exists
+          path: output/summary.json
+        - id: output-schema-valid
+          type: json_schema
+          schemaRef: schemas/summary.json
+
+    - id: csv-implicit-001
+      evaluationMode: forced_injection
+      population: answer
+      type: implicit
+      prompt: "我有一份销售 CSV，请按月份统计收入和订单数，并把结果保存下来。"
+      fixtures:
+        - path: files/sales.csv
+          sha256: sha256:replace
+      expectedOutcome: "在没有显式点名 Skill 时仍完成同样的业务结果。"
+      assertions:
+        - id: output-schema-valid
+          type: json_schema
+          schemaRef: schemas/summary.json
+
+    - id: csv-negative-001
+      evaluationMode: autonomous_trigger
+      population: trigger
+      polarity: should_not_trigger
+      type: hard_negative
+      prompt: "解释 Go 中 buffered channel 和 unbuffered channel 的区别。"
+      expectedOutcome: "不加载 csv-analysis Skill。"
+      assertions:
+        - id: skill-not-loaded
+          type: trace_assertion
+          assertion: skill_not_loaded:csv-analysis

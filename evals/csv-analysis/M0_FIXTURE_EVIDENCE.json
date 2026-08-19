@@ -1,0 +1,51 @@
+{
+  "schema": "skillgate.m0.fixture-evidence.v1",
+  "status": "fixture_observed",
+  "runner": "scripts/run-m0-fixture.mjs",
+  "runtime_status": "m0_fixture_harness",
+  "external_credentials": false,
+  "declared_fixture_reads": [
+    "fixtures/sales.csv",
+    "fixtures/dirty-sales.csv",
+    "fixtures/untrusted-sales.csv"
+  ],
+  "outputs": {
+    "summary.json": "sha256:cf51f4603dec61c11a1611a87045b8b637edd76f2275202de01322230d61ee9f",
+    "insight.json": "sha256:0b3b2b2f19f0f5ca08ce27aaac4d6282353ca70d0a2bdeed6e430d5867aedaba",
+    "data-quality.json": "sha256:b526a0fa33ed2d04fa5dc98b9fb2b81ec79b66b18257371db8f4047473392be6",
+    "security-summary.json": "sha256:c28c0bec76a17284d88a2e65605c974f35319091bcceae0c49e03af166c91a5f",
+    "security-finding.json": "sha256:913e4b98c1d7de6c48f46f529e4e83ad72e4a920bad203379e4366fc455ecfc2",
+    "security-trace.json": "sha256:2bcade441d799c34d4acb5a989e2349bcf36e9a60cddc5669bfae205f4ee9573"
+  },
+  "security": {
+    "finding_status": "fixture_observed",
+    "evidence_ref": "output/security-trace.json",
+    "scanner_version": "m0-fixture-security-v1",
+    "blocked_actions": [
+      "network",
+      "credential.read",
+      "workspace.escape"
+    ],
+    "runtime_probe_executed": false
+  },
+  "failure_modes": {
+    "ids": [
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9"
+    ],
+    "duplicate_completion_contributions": 1,
+    "critical_security_decision": "REJECT"
+  },
+  "identity": {
+    "pair_examples": 24,
+    "trial_examples": 48,
+    "idempotency_examples": 48
+  }
+}

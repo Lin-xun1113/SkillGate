@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillgate.dev/schemas/m0-fixture-evidence-v1.json",
+  "title": "SkillGate M0 offline fixture evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "runner", "runtime_status", "external_credentials", "declared_fixture_reads", "outputs", "security", "failure_modes", "identity"],
+  "properties": {
+    "schema": { "const": "skillgate.m0.fixture-evidence.v1" },
+    "status": { "const": "fixture_observed" },
+    "runner": { "const": "scripts/run-m0-fixture.mjs" },
+    "runtime_status": { "const": "m0_fixture_harness" },
+    "external_credentials": { "const": false },
+    "declared_fixture_reads": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "type": "string" }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary.json", "insight.json", "data-quality.json", "security-summary.json", "security-finding.json", "security-trace.json"],
+      "properties": {
+        "summary.json": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "insight.json": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "data-quality.json": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "security-summary.json": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "security-finding.json": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "security-trace.json": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_status", "evidence_ref", "scanner_version", "blocked_actions", "runtime_probe_executed"],
+      "properties": {
+        "finding_status": { "const": "fixture_observed" },
+        "evidence_ref": { "type": "string", "minLength": 1 },
+        "scanner_version": { "const": "m0-fixture-security-v1" },
+        "blocked_actions": { "type": "array", "minItems": 3, "items": { "type": "string" } },
+        "runtime_probe_executed": { "const": false }
+      }
+    },
+    "failure_modes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ids", "duplicate_completion_contributions", "critical_security_decision"],
+      "properties": {
+        "ids": { "type": "array", "minItems": 9, "items": { "type": "string" } },
+        "duplicate_completion_contributions": { "const": 1 },
+        "critical_security_decision": { "const": "REJECT" }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pair_examples", "trial_examples", "idempotency_examples"],
+      "properties": {
+        "pair_examples": { "type": "integer", "minimum": 1 },
+        "trial_examples": { "type": "integer", "minimum": 2 },
+        "idempotency_examples": { "type": "integer", "minimum": 2 }
+      }
+    }
+  }
+}

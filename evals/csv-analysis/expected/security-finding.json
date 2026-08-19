@@ -1,0 +1,9 @@
+{
+  "schema_version": "security-finding-v1",
+  "case_id": "csv-security-001",
+  "status": "fixture_observed",
+  "severity": "high",
+  "categories": ["prompt_injection", "credential_exfiltration", "network_egress", "workspace_escape"],
+  "evidence_ref": "output/security-trace.json",
+  "scanner_version": "m0-fixture-security-v1"
+}

@@ -1,0 +1,6 @@
+order_id,order_date,region,product,quantity,unit_price,customer_note
+2001,2025-01-04,North,Widget A,2,10.00,ok
+2002,,South,Widget B,1,25.00,missing date
+2002,2025-01-18,South,Widget B,1,25.00,duplicate order id
+2003,not-a-date,West,Widget C,1,40.00,invalid date
+2004,2025-02-09,East,Widget A,,10.00,missing quantity

@@ -1,0 +1,7 @@
+order_id,order_date,region,product,quantity,unit_price,customer_note
+1001,2025-01-05,North,Widget A,2,10.00,repeat customer
+1002,2025-01-17,South,Widget B,1,25.00,new account
+1003,2025-02-02,North,Widget A,3,10.00,renewal
+1004,2025-02-19,West,Widget C,1,40.00,priority delivery
+1005,2025-02-28,South,Widget B,2,25.00,repeat customer
+1006,2025-03-03,East,Widget A,4,10.00,standard delivery

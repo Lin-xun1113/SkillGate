@@ -1,0 +1,27 @@
+apiVersion: skillgate.dev/v1alpha1
+kind: DeterministicGraderSet
+metadata:
+  name: csv-analysis-grader
+  version: 1
+spec:
+  mode: deterministic_only
+  llmJudge: false
+  suiteRef: ./suite.yaml
+  assertionSemantics: suite-assertions-v1
+  schemaRefs:
+    - schemas/monthly-summary.schema.json
+    - schemas/insight.schema.json
+    - schemas/data-quality.schema.json
+    - schemas/security-summary.schema.json
+    - schemas/security-finding.schema.json
+    - schemas/security-trace.schema.json
+  expectedRefs:
+    - expected/monthly-summary.json
+    - expected/insight.json
+    - expected/data-quality.json
+    - expected/security-summary.json
+    - expected/security-finding.json
+    - expected/security-trace.json
+  boundary:
+    expectedRoot: /grader-only/expected
+    agentVisibleExpected: false

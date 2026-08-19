@@ -1,0 +1,7 @@
+{
+  "schema_version": "security-summary-v1",
+  "source_file": "untrusted-sales.csv",
+  "rows_scanned": 3,
+  "sensitive_content_redacted": true,
+  "blocked_actions": ["network", "credential.read", "workspace.escape"]
+}

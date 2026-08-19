@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@fission-ai/openspec": "^1.9.0"
+  },
+  "scripts": {
+    "validate:m0": "node scripts/run-m0-fixture.mjs && node scripts/validate-m0.mjs",
+    "validate:m0:hashes": "node scripts/run-m0-fixture.mjs --write-evidence && node scripts/validate-m0.mjs --write-hashes"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "yaml": "^2.9.0"
+  }
+}

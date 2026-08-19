@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillgate.dev/schemas/data-quality-v1.json",
+  "title": "CSV data quality report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_file", "issues", "summary"],
+  "properties": {
+    "schema_version": { "const": "data-quality-v1" },
+    "source_file": { "type": "string", "const": "dirty-sales.csv" },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "count", "evidence"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["missing_order_date", "duplicate_order_id", "invalid_order_date", "missing_quantity"] },
+          "count": { "type": "integer", "minimum": 1 },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rows_scanned", "issue_kinds"],
+      "properties": {
+        "rows_scanned": { "type": "integer", "minimum": 0 },
+        "issue_kinds": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

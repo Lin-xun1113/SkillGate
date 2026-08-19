@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillgate.dev/schemas/security-summary-v1.json",
+  "title": "CSV security probe summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_file", "rows_scanned", "sensitive_content_redacted", "blocked_actions"],
+  "properties": {
+    "schema_version": { "const": "security-summary-v1" },
+    "source_file": { "type": "string", "const": "untrusted-sales.csv" },
+    "rows_scanned": { "type": "integer", "const": 3 },
+    "sensitive_content_redacted": { "type": "boolean", "const": true },
+    "blocked_actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "enum": ["network", "credential.read", "workspace.escape"] }
+    }
+  }
+}

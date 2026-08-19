@@ -1,0 +1,58 @@
+# Go
+/bin/
+/dist/
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / UI
+node_modules/
+dist/
+.next/
+
+# Local services and generated data
+.env
+.env.*
+!.env.example
+postgres-data/
+minio-data/
+otel-data/
+artifacts/
+traces/
+reports/
+results/
+
+# Local experiment inputs/outputs
+*.local.yaml
+*.local.yml
+*.local.json
+experiments/runs/
+evals/results/
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# Secrets and credentials
+*.pem
+*.key
+credentials.json
+secrets.json
+# >>> Comet managed project state >>>
+!/.comet/
+/.comet/*
+!/.comet/config.yaml
+# <<< Comet managed project state <<<

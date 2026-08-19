@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillgate.dev/schemas/monthly-summary-v1.json",
+  "title": "CSV monthly summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_file", "currency", "months", "total"],
+  "properties": {
+    "schema_version": { "const": "monthly-summary-v1" },
+    "source_file": { "type": "string", "const": "sales.csv" },
+    "currency": { "type": "string", "const": "USD" },
+    "months": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["month", "order_count", "quantity", "revenue"],
+        "properties": {
+          "month": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$" },
+          "order_count": { "type": "integer", "minimum": 0 },
+          "quantity": { "type": "integer", "minimum": 0 },
+          "revenue": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "total": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order_count", "quantity", "revenue"],
+      "properties": {
+        "order_count": { "type": "integer", "minimum": 0 },
+        "quantity": { "type": "integer", "minimum": 0 },
+        "revenue": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

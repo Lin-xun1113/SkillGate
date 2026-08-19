@@ -1,0 +1,16 @@
+{
+  "schema": "skillgate.m0.failure-mode-fixtures.v1",
+  "status": "provisional_contract_fixture",
+  "runtimeStatus": "m0_fixture_harness",
+  "cases": [
+    {"id": "F1", "stage": "precompile", "condition": "invalid_skill_manifest", "expected": "reject"},
+    {"id": "F2", "stage": "suite_validation", "condition": "duplicate_case_id", "expected": "reject"},
+    {"id": "F3", "stage": "pair_validation", "condition": "non_treatment_identity_mismatch", "expected": "reject"},
+    {"id": "F4", "stage": "leakage_validation", "condition": "expected_output_agent_visible", "expected": "reject"},
+    {"id": "F5", "stage": "mode_validation", "condition": "trigger_case_forced_injection", "expected": "invalid"},
+    {"id": "F6", "stage": "grading", "condition": "required_artifact_missing", "expected": "incomplete"},
+    {"id": "F7", "stage": "result_commit", "condition": "duplicate_completion", "expected": "single_aggregate_contribution"},
+    {"id": "F8", "stage": "release_gate", "condition": "critical_security_finding", "expected": "REJECT"},
+    {"id": "F9", "stage": "identity_validation", "condition": "content_hash_mismatch", "expected": "reject"}
+  ]
+}

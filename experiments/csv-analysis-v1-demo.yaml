@@ -1,0 +1,119 @@
+apiVersion: skillgate.dev/v1alpha1
+kind: Experiment
+metadata:
+  name: csv-analysis-v1-demo
+  labels:
+    domain: data-analysis
+    purpose: portfolio-demo
+spec:
+  suite: ./evals/csv-analysis/suite.yaml
+  suiteHash: sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e
+  skills:
+    - name: csv-analysis
+      path: ./skills/csv-analysis
+      version: sha256:5a2153eaf0a11af8d6141b87755526503e02a3af99080464cae27f49e5164090
+  strategies:
+    - name: baseline
+      model:
+        provider: fixture
+        name: deterministic-agent-v1
+        config:
+          temperature: 0
+      skills: []
+      tools:
+        allow:
+          - filesystem.read
+          - filesystem.write
+        deny:
+          - network
+          - credential.read
+          - workspace.escape
+      budget:
+        maxInputTokens: 10000
+        maxOutputTokens: 5000
+        timeoutSeconds: 60
+        maxCostUsd: 0
+      retry:
+        maxAttempts: 2
+        retryableCategories:
+          - provider_transient
+          - worker_lost
+      sandbox:
+        profile: fixture-restricted-v1
+    - name: candidate
+      model:
+        provider: fixture
+        name: deterministic-agent-v1
+        config:
+          temperature: 0
+      skills:
+        - name: csv-analysis
+          version: sha256:5a2153eaf0a11af8d6141b87755526503e02a3af99080464cae27f49e5164090
+      tools:
+        allow:
+          - filesystem.read
+          - filesystem.write
+        deny:
+          - network
+          - credential.read
+          - workspace.escape
+      budget:
+        maxInputTokens: 10000
+        maxOutputTokens: 5000
+        timeoutSeconds: 60
+        maxCostUsd: 0
+      retry:
+        maxAttempts: 2
+        retryableCategories:
+          - provider_transient
+          - worker_lost
+      sandbox:
+        profile: fixture-restricted-v1
+  arms:
+    - name: without_skill
+      strategy: baseline
+    - name: with_skill
+      strategy: candidate
+  pairing:
+    treatment: skill_version
+    baselineArm: without_skill
+    candidateArm: with_skill
+    identityExamples: ./evals/csv-analysis/identity-examples.json
+  repetitions: 3
+  execution:
+    harness: langgraph
+    harnessVersion: provisional-m0
+    environment: docker://skillgate/case-csv:0.1.0
+    environmentDescriptor: ./environments/case-csv-v1.json
+    environmentHash: sha256:32626be493e0395b64e6275d5202819e4d1c8bdd91ea33eaae187819e21d073e
+    timeoutSeconds: 60
+    maxConcurrent: 2
+  grading:
+    ref: ./evals/csv-analysis/grader.yaml
+    hash: sha256:b5f94acfd374f9c92123e4e25006aacd4bf703aefab72dc23a9f00b98f779892
+    deterministic:
+      - id: suite-assertions-v1
+        type: suite_assertions
+        version: 1
+        suiteRef: ./evals/csv-analysis/suite.yaml
+      - id: output-schema-v1
+        type: json_schema
+        version: 1
+        schemaRefs:
+          - ./evals/csv-analysis/schemas/monthly-summary.schema.json
+          - ./evals/csv-analysis/schemas/insight.schema.json
+          - ./evals/csv-analysis/schemas/data-quality.schema.json
+          - ./evals/csv-analysis/schemas/security-summary.schema.json
+          - ./evals/csv-analysis/schemas/security-finding.schema.json
+          - ./evals/csv-analysis/schemas/security-trace.schema.json
+    llm:
+      enabled: false
+  policy: ./policies/conservative-release.yaml
+  policyHash: sha256:273c90991e0bb9752f383b8ed946e818a47a8bd6ab15047b072048f36a771994
+  provenance:
+    source: hand-authored
+    generatorModel: null
+    generatorPromptHash: null
+    leakageCheck: passed
+    humanReview: passed
+  manifestHash: sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184

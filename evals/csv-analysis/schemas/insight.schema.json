@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillgate.dev/schemas/csv-insight-v1.json",
+  "title": "CSV analysis insight",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_file", "highest_revenue_month", "evidence"],
+  "properties": {
+    "schema_version": { "const": "csv-insight-v1" },
+    "source_file": { "type": "string", "const": "sales.csv" },
+    "highest_revenue_month": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$" },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revenue", "calculation"],
+      "properties": {
+        "revenue": { "type": "number", "minimum": 0 },
+        "calculation": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

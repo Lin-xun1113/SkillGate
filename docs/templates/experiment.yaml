@@ -1,0 +1,72 @@
+apiVersion: skillgate.dev/v1alpha1
+kind: Experiment
+metadata:
+  name: csv-analysis-v1-demo
+  labels:
+    domain: data-analysis
+    purpose: portfolio-demo
+spec:
+  suite: ./evals/csv-analysis/suite.yaml
+  skills:
+    - path: ./skills/csv-analysis
+  strategies:
+    - name: baseline
+      model:
+        provider: fixture
+        name: deterministic-agent-v1
+        config:
+          temperature: 0
+      skills: []
+      tools:
+        allow: [filesystem.read, filesystem.write]
+        deny: [network]
+      budget:
+        maxInputTokens: 10000
+        maxOutputTokens: 5000
+        timeoutSeconds: 60
+        maxCostUsd: 0
+    - name: candidate
+      model:
+        provider: fixture
+        name: deterministic-agent-v1
+        config:
+          temperature: 0
+      skills:
+        - name: csv-analysis
+          version: sha256:replace-after-registration
+      tools:
+        allow: [filesystem.read, filesystem.write]
+        deny: [network]
+      budget:
+        maxInputTokens: 10000
+        maxOutputTokens: 5000
+        timeoutSeconds: 60
+        maxCostUsd: 0
+  arms:
+    - name: without_skill
+      strategy: baseline
+    - name: with_skill
+      strategy: candidate
+  pairing:
+    treatment: skill_version
+    baselineArm: without_skill
+    candidateArm: with_skill
+  repetitions: 3
+  execution:
+    harness: langgraph
+    environment: docker://skillgate/case-csv:replace-after-build
+    timeoutSeconds: 60
+    maxConcurrent: 2
+  grading:
+    deterministic:
+      - id: output-schema
+        type: json_schema
+        schemaRef: ./evals/csv-analysis/schemas/summary.json
+        weight: 1.0
+    llm:
+      enabled: false
+  policy: ./policies/conservative-release.yaml
+  provenance:
+    source: hand-authored
+    leakageCheck: pending
+    humanReview: pending

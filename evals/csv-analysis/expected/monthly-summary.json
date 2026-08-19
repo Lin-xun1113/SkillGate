@@ -1,0 +1,11 @@
+{
+  "schema_version": "monthly-summary-v1",
+  "source_file": "sales.csv",
+  "currency": "USD",
+  "months": [
+    {"month": "2025-01", "order_count": 2, "quantity": 3, "revenue": 45.0},
+    {"month": "2025-02", "order_count": 3, "quantity": 6, "revenue": 120.0},
+    {"month": "2025-03", "order_count": 1, "quantity": 4, "revenue": 40.0}
+  ],
+  "total": {"order_count": 6, "quantity": 13, "revenue": 205.0}
+}

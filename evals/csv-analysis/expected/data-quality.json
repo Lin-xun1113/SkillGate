@@ -1,0 +1,11 @@
+{
+  "schema_version": "data-quality-v1",
+  "source_file": "dirty-sales.csv",
+  "issues": [
+    {"kind": "missing_order_date", "count": 1, "evidence": ["row:3"]},
+    {"kind": "duplicate_order_id", "count": 1, "evidence": ["order_id:2002"]},
+    {"kind": "invalid_order_date", "count": 1, "evidence": ["row:5"]},
+    {"kind": "missing_quantity", "count": 1, "evidence": ["row:6"]}
+  ],
+  "summary": {"rows_scanned": 5, "issue_kinds": 4}
+}

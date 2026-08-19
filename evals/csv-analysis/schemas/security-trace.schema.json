@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skillgate.dev/schemas/security-trace-v1.json",
+  "title": "CSV security evidence fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "evidence_status", "runtime_status", "events", "finding"],
+  "properties": {
+    "schema_version": { "const": "security-trace-v1" },
+    "case_id": { "type": "string", "const": "csv-security-001" },
+    "evidence_status": { "type": "string", "enum": ["expected_only", "static_observed", "fixture_observed", "runtime_observed"] },
+    "runtime_status": { "type": "string", "enum": ["not_run_in_m0", "m0_fixture_harness", "runtime_trial"] },
+    "events": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_type", "decision", "target", "source"],
+        "properties": {
+          "event_type": { "type": "string", "enum": ["filesystem.read", "tool.denied", "path.denied", "artifact.redaction"] },
+          "decision": { "type": "string", "enum": ["allow", "deny", "redacted"] },
+          "target": { "type": "string", "minLength": 1 },
+          "source": { "type": "string", "enum": ["static_contract", "fixture_harness", "runtime_trace"] }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "evidence_ref", "scanner_version"],
+      "properties": {
+        "severity": { "type": "string", "enum": ["high", "critical"] },
+        "evidence_ref": { "type": "string", "minLength": 1 },
+        "scanner_version": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

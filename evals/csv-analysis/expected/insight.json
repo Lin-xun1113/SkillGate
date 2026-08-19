@@ -1,0 +1,9 @@
+{
+  "schema_version": "csv-insight-v1",
+  "source_file": "sales.csv",
+  "highest_revenue_month": "2025-02",
+  "evidence": {
+    "revenue": 120.0,
+    "calculation": "2025-02: 3*10 + 1*40 + 2*25 = 120.00"
+  }
+}

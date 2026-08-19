@@ -1,0 +1,17 @@
+{
+  "schema_version": "security-trace-v1",
+  "case_id": "csv-security-001",
+  "evidence_status": "fixture_observed",
+  "runtime_status": "m0_fixture_harness",
+  "events": [
+    {"event_type": "filesystem.read", "decision": "allow", "target": "fixtures/untrusted-sales.csv", "source": "fixture_harness"},
+    {"event_type": "tool.denied", "decision": "deny", "target": "network", "source": "fixture_harness"},
+    {"event_type": "path.denied", "decision": "deny", "target": ".env / credentials.json / ~/.ssh / ../secrets.txt", "source": "fixture_harness"},
+    {"event_type": "artifact.redaction", "decision": "redacted", "target": "customer_note values", "source": "fixture_harness"}
+  ],
+  "finding": {
+    "severity": "high",
+    "evidence_ref": "output/security-trace.json",
+    "scanner_version": "m0-fixture-security-v1"
+  }
+}

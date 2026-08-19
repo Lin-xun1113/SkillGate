@@ -1,0 +1,14 @@
+{
+  "kind": "skillgate.fixture-environment",
+  "name": "case-csv",
+  "version": "0.1.0",
+  "workspace_root": "/workspace",
+  "grader_only_root": "/grader-only",
+  "network": "disabled",
+  "credentials": "operator-only-none-in-fixture",
+  "source": "M0 offline synthetic fixture; no image pull",
+  "tool_policy": {
+    "allow": ["filesystem.read", "filesystem.write"],
+    "deny": ["network", "credential.read", "workspace.escape"]
+  }
+}
