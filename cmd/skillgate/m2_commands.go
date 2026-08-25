@@ -213,6 +213,7 @@ func completionFromFlags(args []string) (scheduler.Completion, error) {
 	return scheduler.Completion{
 		LogicalTrialID: flagValue(args, "--logical-trial-id", ""), TrialID: flagValue(args, "--trial-id", ""),
 		WorkerID: flagValue(args, "--worker-id", ""), LeaseToken: token, LeaseGeneration: int64(intFlag(args, "--lease-generation", 0)),
+		RequestHash: flagValue(args, "--request-hash", ""), IdempotencyKey: flagValue(args, "--idempotency-key", ""),
 		ManifestHash: hash, Manifest: raw, Outcome: scheduler.Outcome(strings.ToUpper(flagValue(args, "--outcome", ""))),
 		Category: retry.Category(strings.ToUpper(flagValue(args, "--category", ""))), EventSequence: int64(intFlag(args, "--event-sequence", 0)),
 	}, nil

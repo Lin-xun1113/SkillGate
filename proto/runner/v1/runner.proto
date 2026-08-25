@@ -1,0 +1,234 @@
+syntax = "proto3";
+
+package runner.v1;
+
+option go_package = "github.com/Lin-xun1113/SkillGate/gen/go/runner/v1;runnerv1";
+
+// RunnerControl defines the gRPC interface between the Go Control Plane and Trial Workers.
+service RunnerControl {
+  // RegisterWorker registers a worker and returns an active session token.
+  rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+
+  // ClaimTrial attempts to claim a pending trial attempt for execution.
+  rpc ClaimTrial(ClaimTrialRequest) returns (ClaimTrialResponse);
+
+  // Heartbeat renews lease and reports progress / resource usage; also receives cancellation signals.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // ReportEvent appends a structured lifecycle or audit event.
+  rpc ReportEvent(ReportEventRequest) returns (ReportEventResponse);
+
+  // CompleteTrial commits trial results atomically and idempotently.
+  rpc CompleteTrial(CompleteTrialRequest) returns (CompleteTrialResponse);
+
+  // FailTrial reports trial failure and triggers retry scheduling or terminal transition.
+  rpc FailTrial(FailTrialRequest) returns (FailTrialResponse);
+}
+
+// Capabilities declared by a worker.
+message WorkerCapabilities {
+  repeated string harnesses = 1;
+  repeated string graders = 2;
+  repeated string sandbox_profiles = 3;
+  int32 max_concurrency = 4;
+}
+
+// Worker environment metadata.
+message WorkerEnvironment {
+  string os = 1;
+  string arch = 2;
+  string hostname = 3;
+  string python_version = 4;
+}
+
+message RegisterWorkerRequest {
+  string worker_id = 1;
+  string protocol_version = 2;
+  string worker_version = 3;
+  WorkerCapabilities capabilities = 4;
+  WorkerEnvironment environment = 5;
+  map<string, string> metadata = 6;
+}
+
+message RegisterWorkerResponse {
+  bool accepted = 1;
+  string session_token = 2;
+  int64 heartbeat_interval_ms = 3;
+  int64 max_lease_ms = 4;
+  string server_protocol_version = 5;
+  repeated string rejected_capabilities = 6;
+  string reject_reason = 7;
+}
+
+message ClaimTrialRequest {
+  string worker_id = 1;
+  string session_token = 2;
+  string harness = 3;
+  string sandbox_profile = 4;
+  int32 lease_duration_sec = 5;
+  string preferred_experiment_id = 6;
+}
+
+message ClaimTrialResponse {
+  bool has_trial = 1;
+  string trial_id = 2;
+  string logical_trial_id = 3;
+  string experiment_id = 4;
+  string pair_id = 5;
+  string arm = 6;
+  int32 attempt_no = 7;
+  string lease_token = 8;
+  int64 lease_generation = 9;
+  int64 lease_expires_at_unix_ms = 10;
+  string request_hash = 11;
+  string trial_request_json = 12;
+}
+
+message ResourceUsage {
+  int64 input_tokens = 1;
+  int64 output_tokens = 2;
+  int64 elapsed_ms = 3;
+  int32 tool_calls = 4;
+  int64 peak_memory_bytes = 5;
+}
+
+enum HeartbeatAction {
+  HEARTBEAT_ACTION_UNSPECIFIED = 0;
+  HEARTBEAT_ACTION_CONTINUE = 1;
+  HEARTBEAT_ACTION_CANCEL_REQUESTED = 2;
+  HEARTBEAT_ACTION_LEASE_REJECTED = 3;
+  HEARTBEAT_ACTION_SERVER_SHUTDOWN = 4;
+}
+
+message HeartbeatRequest {
+  string worker_id = 1;
+  string session_token = 2;
+  string trial_id = 3;
+  string lease_token = 4;
+  string phase = 5;
+  int64 event_sequence = 6;
+  int64 started_at_unix_ms = 7;
+  ResourceUsage resource_usage = 8;
+  int64 lease_generation = 9;
+}
+
+message HeartbeatResponse {
+  HeartbeatAction action = 1;
+  int64 lease_expires_at_unix_ms = 2;
+  string message = 3;
+}
+
+enum EventReportStatus {
+  EVENT_REPORT_STATUS_UNSPECIFIED = 0;
+  EVENT_REPORT_STATUS_ACCEPTED = 1;
+  EVENT_REPORT_STATUS_DUPLICATE_IGNORED = 2;
+  EVENT_REPORT_STATUS_SEQUENCE_GAP = 3;
+  EVENT_REPORT_STATUS_REJECTED = 4;
+}
+
+message ReportEventRequest {
+  string event_id = 1;
+  string trial_id = 2;
+  string worker_id = 11;
+  string session_token = 12;
+  string lease_token = 13;
+  int64 lease_generation = 14;
+  string logical_trial_id = 3;
+  string experiment_id = 4;
+  int32 attempt_no = 5;
+  int64 sequence = 6;
+  string event_type = 7;
+  int64 occurred_at_unix_ms = 8;
+  string payload_json = 9;
+  string payload_hash = 10;
+}
+
+message ReportEventResponse {
+  EventReportStatus status = 1;
+  int64 highest_sequence = 2;
+  string message = 3;
+}
+
+message ArtifactManifest {
+  string artifact_id = 1;
+  string kind = 2;
+  string media_type = 3;
+  string sha256 = 4;
+  int64 size_bytes = 5;
+  string storage_key = 6;
+  string local_path = 7;
+  int64 created_at_unix_ms = 8;
+}
+
+enum CompletionStatus {
+  COMPLETION_STATUS_UNSPECIFIED = 0;
+  COMPLETION_STATUS_COMMITTED = 1;
+  COMPLETION_STATUS_ALREADY_COMMITTED = 2;
+  COMPLETION_STATUS_LEASE_EXPIRED = 3;
+  COMPLETION_STATUS_CONFLICT = 4;
+  COMPLETION_STATUS_INVALID_REQUEST = 5;
+}
+
+message CompleteTrialRequest {
+  string worker_id = 1;
+  string session_token = 2;
+  string trial_id = 3;
+  string logical_trial_id = 4;
+  int32 attempt_no = 5;
+  string lease_token = 6;
+  string idempotency_key = 7;
+  string request_hash = 8;
+  int64 final_sequence = 9;
+  int32 exit_code = 10;
+  string outcome = 11; // SUCCEEDED, FAILED, TIMED_OUT, CANCELLED
+  string outcome_manifest_json = 12;
+  repeated ArtifactManifest artifacts = 13;
+  ResourceUsage usage = 14;
+  string grades_json = 15;
+  int64 lease_generation = 16;
+}
+
+message CompleteTrialResponse {
+  CompletionStatus status = 1;
+  string result_id = 2;
+  string message = 3;
+}
+
+enum FailureCategory {
+  FAILURE_CATEGORY_UNSPECIFIED = 0;
+  FAILURE_CATEGORY_TRANSIENT = 1;
+  FAILURE_CATEGORY_PERMANENT = 2;
+  FAILURE_CATEGORY_TIMEOUT = 3;
+  FAILURE_CATEGORY_SANDBOX_ERROR = 4;
+  FAILURE_CATEGORY_INTERNAL = 5;
+}
+
+enum FailTrialStatus {
+  FAIL_TRIAL_STATUS_UNSPECIFIED = 0;
+  FAIL_TRIAL_STATUS_RECORDED = 1;
+  FAIL_TRIAL_STATUS_RETRY_SCHEDULED = 2;
+  FAIL_TRIAL_STATUS_TERMINAL_FAILED = 3;
+  FAIL_TRIAL_STATUS_LEASE_EXPIRED = 4;
+  FAIL_TRIAL_STATUS_REJECTED = 5;
+}
+
+message FailTrialRequest {
+  string worker_id = 1;
+  string session_token = 2;
+  string trial_id = 3;
+  string logical_trial_id = 4;
+  int32 attempt_no = 5;
+  string lease_token = 6;
+  FailureCategory failure_category = 7;
+  string error_message = 8;
+  int64 event_sequence = 9;
+  string outcome_manifest_json = 10;
+  string request_hash = 11;
+  int64 lease_generation = 12;
+}
+
+message FailTrialResponse {
+  FailTrialStatus status = 1;
+  int32 next_attempt_no = 2;
+  string message = 3;
+}

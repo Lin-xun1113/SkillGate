@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY workers/python/gen /app/gen
+COPY workers/python/fixture_worker /app/fixture_worker
+
+RUN pip install --no-cache-dir grpcio protobuf
+
+ENV PYTHONPATH=/app:/app/gen
+ENV RUNNER_GRPC_ADDR=control-plane:50051
+
+ENTRYPOINT ["python", "-m", "fixture_worker.worker"]
+CMD ["--server", "control-plane:50051", "--worker-id", "docker-py-worker-01"]

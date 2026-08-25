@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: skillgate-postgres
+    environment:
+      POSTGRES_USER: skillgate
+      POSTGRES_PASSWORD: skillgate_password
+      POSTGRES_DB: skillgate
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skillgate -d skillgate"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  bootstrap:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    container_name: skillgate-bootstrap
+    environment:
+      DATABASE_URL: postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/usr/local/bin/compose-bootstrap.sh"]
+    command: []
+
+  control-plane:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    container_name: skillgate-control-plane
+    environment:
+      DATABASE_URL: postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable
+    ports:
+      - "50051:50051"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+    command: ["serve", "--grpc-addr", "0.0.0.0:50051", "--database-url", "postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable"]
+
+  fixture-worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.worker
+    container_name: skillgate-fixture-worker
+    environment:
+      RUNNER_GRPC_ADDR: control-plane:50051
+    depends_on:
+      control-plane:
+        condition: service_started
+      bootstrap:
+        condition: service_completed_successfully
+    command: ["--server", "control-plane:50051", "--worker-id", "compose-worker-01", "--max-trials", "48", "--delay", "0.02"]

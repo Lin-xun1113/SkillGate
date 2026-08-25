@@ -135,9 +135,12 @@ func resultManifest(t *testing.T, marker string) ([]byte, string) {
 }
 
 func completionFor(claim scheduler.Claim, manifest []byte, hash string, outcome scheduler.Outcome, category retry.Category) scheduler.Completion {
+	requestHash, _ := scheduler.TrialRequestHash(claim.ExperimentID, claim.LogicalTrialID, claim.TrialID, claim.PairID, claim.Arm, claim.Attempt)
+	idempotencyKey, _ := scheduler.ResultIdempotencyKey(claim.TrialID, hash)
 	return scheduler.Completion{
 		LogicalTrialID: claim.LogicalTrialID, TrialID: claim.TrialID, WorkerID: claim.WorkerID,
 		LeaseToken: claim.LeaseToken, LeaseGeneration: claim.LeaseGeneration,
+		RequestHash: requestHash, IdempotencyKey: idempotencyKey,
 		ManifestHash: hash, Manifest: manifest, Outcome: outcome, Category: category, EventSequence: 1,
 	}
 }
