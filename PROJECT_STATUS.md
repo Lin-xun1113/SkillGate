@@ -101,10 +101,10 @@ M1 第五轮独立 Verify 后，用户要求重新核对设计并完整收敛。
 
 ## 下一次会话清单
 
-1. 在 Native Shape 点确认已记录的三项 M1 设计（URI+Descriptor、Raw text+LF、Declared hashes）——已完成（2026-08-25）。
-2. 重新提交 Builder 候选（验收项 A1–A9），执行 Runtime checks 并启动独立 Verifier。
-3. 若 Verify 通过，归档 M1 change；若仍失败，只处理新的、可复现的契约缺口。
-4. M1 归档后创建并确认 M2 Native Shape，冻结 PostgreSQL Queue/Lease、Retry 和幂等 Result Commit Contract。
+1. ✅ 在 Native Shape 点确认已记录的三项 M1 设计（URI+Descriptor、Raw text+LF、Declared hashes）——已完成（2026-08-25）。
+2. ✅ Builder 候选提交（验收项 A1–A9），Runtime 5 项检查全部通过，独立 Verifier 判定全部 passed。
+3. ✅ Verify 通过，M1 change 已归档并合并到 master（2026-08-25）。
+4. ▶️ 下一步：创建并确认 M2 Native Shape，冻结 PostgreSQL Queue/Lease、Retry 和幂等 Result Commit Contract。
 5. Python Worker 仍按实施计划在 M3/M4 引入。
 
 ## 明确延期的事项
