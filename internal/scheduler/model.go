@@ -117,6 +117,8 @@ type Claim struct {
 	ExperimentID    string    `json:"experiment_id"`
 	LogicalTrialID  string    `json:"logical_trial_id"`
 	TrialID         string    `json:"trial_id"`
+	PairID          string    `json:"pair_id,omitempty"`
+	Arm             string    `json:"arm,omitempty"`
 	Attempt         int       `json:"attempt"`
 	WorkerID        string    `json:"worker_id"`
 	LeaseToken      string    `json:"lease_token"`
@@ -132,6 +134,11 @@ type Heartbeat struct {
 	LeaseGeneration int64
 	EventSequence   int64
 	Phase           string
+	Usage           ResourceUsage
+}
+
+type HeartbeatResult struct {
+	LeaseExpiresAt time.Time
 }
 
 type Completion struct {
@@ -140,8 +147,13 @@ type Completion struct {
 	WorkerID        string
 	LeaseToken      string
 	LeaseGeneration int64
+	RequestHash     string
+	IdempotencyKey  string
 	ManifestHash    string
 	Manifest        []byte
+	Artifacts       []byte
+	Usage           []byte
+	Grades          []byte
 	Outcome         Outcome
 	Category        retry.Category
 	EventSequence   int64
@@ -177,6 +189,54 @@ type CommitResult struct {
 	Idempotent     bool    `json:"idempotent"`
 	RetryScheduled bool    `json:"retry_scheduled"`
 	NextTrialID    string  `json:"next_trial_id,omitempty"`
+}
+
+type ResourceUsage struct {
+	InputTokens     int64 `json:"input_tokens"`
+	OutputTokens    int64 `json:"output_tokens"`
+	ElapsedMS       int64 `json:"elapsed_ms"`
+	ToolCalls       int32 `json:"tool_calls"`
+	PeakMemoryBytes int64 `json:"peak_memory_bytes"`
+}
+
+type Event struct {
+	EventID         string
+	TrialID         string
+	LogicalTrialID  string
+	ExperimentID    string
+	AttemptNo       int
+	WorkerID        string
+	LeaseToken      string
+	LeaseGeneration int64
+	Sequence        int64
+	EventType       string
+	OccurredAt      time.Time
+	Payload         []byte
+	PayloadHash     string
+}
+
+type EventResult struct {
+	Status          string
+	HighestSequence int64
+	Message         string
+}
+
+type ClaimFilter struct {
+	PreferredExperimentID string
+}
+
+func TrialRequestHash(experimentID, logicalTrialID, trialID, pairID, arm string, attempt int) (string, error) {
+	if experimentID == "" || logicalTrialID == "" || trialID == "" || attempt < 1 {
+		return "", fmt.Errorf("trial request identity 不完整")
+	}
+	return identity.HashCanonical(map[string]any{
+		"experiment_id":    experimentID,
+		"logical_trial_id": logicalTrialID,
+		"trial_id":         trialID,
+		"pair_id":          pairID,
+		"arm":              arm,
+		"attempt_no":       attempt,
+	})
 }
 
 func LogicalTrialID(pairID, arm string) (string, error) {

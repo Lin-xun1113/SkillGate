@@ -1,0 +1,266 @@
+schema: comet.native.v4
+name: m3-runner-protocol
+language: zh-CN
+phase: archive
+status: active
+state_version: 15
+brief: brief.md
+spec_changes:
+  - capability: runner-protocol
+    operation: create
+    source: specs/runner-protocol/spec.md
+workspace:
+  isolation: branch
+  change_branch: comet/m3-runner-protocol
+  target_branch: master
+  finish: merge
+loop:
+  stage: archive-ready
+  goal_cycle: 1
+  iteration: 3
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: archive
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：协议定义与代码生成：编写 `runner/v1/runner.proto`，成功编译生成 Go 与 Python 的
+      Protobuf/gRPC 桩代码；协议覆盖注册、领取、心跳、事件、完成与失败。
+    result: passed
+    reason:
+      text: proto 定义 6 个 RPC，Go/Python 桩代码生成并编译通过。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：Worker 注册与会话管理：Go gRPC Server 支持 Worker 注册，校验 capability 与 protocol
+      version，生成有效 Worker Session；拒绝不兼容版本。
+    result: passed
+    reason:
+      text: RegisterWorker 校验 capability 与 protocol version，生成带 TTL 的 Session Token
+        并鉴权。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：任务领取与 Request Hash 校验：Worker 通过 gRPC 领取任务，返回包含 Request Hash、Lease Token
+      与到期时间的 Payload；Worker 校验 Request Hash，不匹配时拒绝执行。
+    result: passed
+    reason:
+      text: ClaimTrial 返回 request_hash/lease_token/到期时间，双端校验 Request Hash。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：心跳续租与取消通知：Worker 定期发送心跳上报 phase 与 resource usage；当实验进入
+      `CANCEL_REQUESTED` 时，心跳响应下发取消指令，Worker 优雅终止并上报取消。
+    result: passed
+    reason:
+      text: Heartbeat 续租并回传真实到期时间，上报 usage，CANCEL_REQUESTED 时下发取消，Worker 优雅上报
+        CANCELLED。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：事件流上报与去重：Worker 上报结构化事件流（Sequence 单调递增），服务端校验 Sequence 并按 Payload Hash
+      去重，保证事件审计完整性。
+    result: passed
+    reason:
+      text: ReportEvent 在锁事务内校验 sequence 递增与 payload hash，持久化 trial_events 并幂等去重。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：幂等结果与失败提交：Worker 提交 Trial 结果或失败原因（含 Artifact Manifest 与
+      Usage），服务端完成校验与原子入库；重复提交保持幂等且计数不重复。
+    result: passed
+    reason:
+      text: CompleteTrial 校验 request_hash/idempotency_key/artifact
+        manifest，原子入库幂等，artifact 与 usage 实际落库。
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: A7：Python Fixture Worker 协议闭环：Python Fixture Worker 在无真实 LLM 与外部
+      Credential 的情况下，连接 Go Server 完成 M0 样例实验任务的领取、心跳、事件与提交全流程。
+    result: passed
+    reason:
+      text: Python Fixture Worker 无真实 LLM/Credential 完成 48 Trial 全流程，4
+        种模式齐备，TIMEOUT_SIM 为停止心跳触发超时。
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: A8：CLI 服务命令与 Docker Compose 编排：提供 `skillgate serve` 服务启动命令，并提供可一键拉起
+      PostgreSQL、Go Server 与 Python Worker 运行实验的 Docker Compose 编排配置。
+    result: passed
+    reason:
+      text: skillgate serve 命令与 docker-compose 一键编排（含 bootstrap
+        migration/materialize）验证通过。
+      truncated: false
+builder_handoff:
+  candidate_id: e6327074-baa0-4e92-afd1-ff556c333901
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:3cd0dcc7-e0e8-4d63-a4f0-61ec985a8c09
+  iteration: 3
+  summary:
+    text: 按 M3 设计文档对齐并补齐：Worker 精简为 spec 第 4 节的 4 种模式
+      NORMAL/FAIL/TIMEOUT_SIM/CANCEL_AWARE，补回声明式 ArtifactManifest（内容哈希元数据），回退
+      harness/sandbox 物化过度设计，移除 RejectedCapabilities 死代码，brief 措辞对齐 spec，新增
+      artifact/usage 落库断言与模式单测。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+  checks:
+    - name:
+        text: Go all tests
+        truncated: false
+      result: passed
+      note:
+        text: go test -count=1 ./...
+        truncated: false
+    - name:
+        text: Go race tests
+        truncated: false
+      result: passed
+      note:
+        text: go test -race ./internal/runner ./internal/store/postgres
+        truncated: false
+    - name:
+        text: Go vet
+        truncated: false
+      result: passed
+      note:
+        text: go vet ./...
+        truncated: false
+    - name:
+        text: M3 Python worker real Postgres integration test
+        truncated: false
+      result: passed
+      note:
+        text: TEST_DATABASE_URL=... go test -count=1 -run TestM3 ./cmd/skillgate
+        truncated: false
+    - name:
+        text: Python unit tests
+        truncated: false
+      result: passed
+      note:
+        text: pytest workers/python/tests
+        truncated: false
+    - name:
+        text: Docker Compose config validation
+        truncated: false
+      result: passed
+      note:
+        text: docker compose -f deploy/docker-compose.yml config
+        truncated: false
+    - name:
+        text: M0 regression check
+        truncated: false
+      result: passed
+      note:
+        text: npm run validate:m0
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: M3 使用轻量级 Python Fixture Worker 和测试桩，未集成真实 LLM Provider API（计划于 M4 引入
+        LangGraph 真实 Agent 与 Docker Sandbox）。
+      truncated: false
+    - text: M3 阶段 Artifact Manifest 采用内容寻址声明，仅校验声明的 SHA-256 元数据，不实现本地文件字节校验或远程
+        MinIO/S3 上传（架构上保留 S3 扩展兼容）。
+      truncated: false
+  known_limits_truncated: false
+  submitted_at: 2026-08-25T15:49:43.871Z
+blockers: []
+verification:
+  candidate_id: e6327074-baa0-4e92-afd1-ff556c333901
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:cd542452-3707-49e2-acb9-046e08b7382a
+  iteration: 3
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks: []
+  summary:
+    text: M3 Runner Protocol 与 Python Fixture Worker 全部 8 项验收标准 (A1-A8) 均已在 Go
+      单元测试、真实 PostgreSQL 集成测试、Python pytest 与 Docker Compose 配置中独立验证通过；spec 第 4
+      节的 4 种模式齐备，artifact/usage 实际落库。
+    truncated: false
+  risks:
+    - text: CANCEL_AWARE 复用通用心跳取消路径，无专属分支（设计正确，非缺陷）。
+      truncated: false
+    - text: FailTrial proto 仅含 request_hash，无 idempotency_key/artifacts 字段（符合失败提交语义）。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-08-25T15:54:03.065Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: M3 Runner Protocol 与 Python Fixture Worker 全部 8 项验收标准 (A1-A8) 均已在 Go
+        单元测试、真实 PostgreSQL 集成测试与 Python pytest 中验证通过。
+      truncated: false
+    completed_at: 2026-08-25T12:22:20.873Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 用户明确要求完成 M3，并基于代码复核结果否定当前 skill-coordinated pass；返回 Build
+        修复协议鉴权、事件持久化、结果字段与 Compose 演示缺陷。
+      truncated: false
+    completed_at: 2026-08-25T13:33:39.523Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: M3 Runner Protocol 与 Python Fixture Worker 全部 8 项验收标准 (A1-A8) 均已在 Go
+        单元测试、真实 PostgreSQL 集成测试、Python pytest 与 Docker Compose 配置中独立验证通过。
+      truncated: false
+    completed_at: 2026-08-25T15:02:41.862Z
+  - goal_cycle: 1
+    iteration: 2
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 按设计文档对齐后修改了实现：Worker 精简为 spec 的 4
+        种模式（NORMAL/FAIL/TIMEOUT_SIM/CANCEL_AWARE），补回声明式 ArtifactManifest，回退
+        harness/sandbox 物化过度设计，并修订 brief 措辞与新增测试。返回 Build 重新提交候选。
+      truncated: false
+    completed_at: 2026-08-25T15:49:09.184Z
+  - goal_cycle: 1
+    iteration: 3
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: M3 Runner Protocol 与 Python Fixture Worker 全部 8 项验收标准 (A1-A8) 均已在 Go
+        单元测试、真实 PostgreSQL 集成测试、Python pytest 与 Docker Compose 配置中独立验证通过；spec 第
+        4 节的 4 种模式齐备，artifact/usage 实际落库。
+      truncated: false
+    completed_at: 2026-08-25T15:54:03.065Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: false
+created_at: 2026-08-25T12:00:22.698Z

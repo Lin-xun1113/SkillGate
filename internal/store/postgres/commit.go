@@ -17,7 +17,7 @@ func (s *Store) Complete(ctx context.Context, completion scheduler.Completion) (
 	if err != nil || manifestHash != completion.ManifestHash {
 		return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "result manifest hash 无法复算", Cause: err}
 	}
-	if completion.LogicalTrialID == "" || completion.TrialID == "" || completion.WorkerID == "" || completion.LeaseToken == "" || completion.LeaseGeneration < 1 || !scheduler.ValidOutcome(completion.Outcome) {
+	if completion.LogicalTrialID == "" || completion.TrialID == "" || completion.WorkerID == "" || completion.LeaseToken == "" || completion.RequestHash == "" || !scheduler.ValidOutcome(completion.Outcome) {
 		return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "completion 字段不完整"}
 	}
 
@@ -41,6 +41,15 @@ func (s *Store) Complete(ctx context.Context, completion scheduler.Completion) (
 	if row.LogicalTrialID != completion.LogicalTrialID {
 		return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeIdentityConflict, Message: "logical trial identity 不匹配"}
 	}
+	if row.RequestHash != completion.RequestHash {
+		return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeIdentityConflict, Message: "request hash 不匹配"}
+	}
+	if completion.IdempotencyKey != "" {
+		expectedKey, keyErr := scheduler.ResultIdempotencyKey(completion.TrialID, completion.ManifestHash)
+		if keyErr != nil || completion.IdempotencyKey != expectedKey {
+			return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeResultConflict, Message: "idempotency key 不匹配"}
+		}
+	}
 
 	if !row.LeaseValid && row.OutcomeManifestHash != "" &&
 		(row.OutcomeManifestHash == expiryManifestHash || row.OutcomeManifestHash == cancellationManifestHash || row.OutcomeManifestHash == budgetManifestHash) {
@@ -49,7 +58,7 @@ func (s *Store) Complete(ctx context.Context, completion scheduler.Completion) (
 	if row.Owner != completion.WorkerID {
 		return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeOwnerMismatch, Message: "lease owner 不匹配"}
 	}
-	if row.Generation != completion.LeaseGeneration || !leasetoken.Matches(row.TokenHash, completion.LeaseToken) {
+	if (completion.LeaseGeneration > 0 && row.Generation != completion.LeaseGeneration) || !leasetoken.Matches(row.TokenHash, completion.LeaseToken) {
 		return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeLeaseMismatch, Message: "lease token 或 fence 不匹配"}
 	}
 	if row.OutcomeManifestHash != "" {
@@ -112,7 +121,7 @@ WHERE trial_id=$1`, completion.TrialID, attemptStatus, completion.EventSequence,
 		return scheduler.CommitResult{LogicalTrialID: row.LogicalTrialID, TrialID: completion.TrialID, ManifestHash: completion.ManifestHash, Outcome: completion.Outcome, RetryScheduled: true, NextTrialID: nextTrialID}, nil
 	}
 
-	result, err := finalizeLogicalTrial(ctx, tx, row.ExperimentID, row.LogicalTrialID, completion.TrialID, completion.ManifestHash, completion.Manifest, completion.Outcome, completion.WorkerID, row.TrialStatus)
+	result, err := finalizeLogicalTrialWithMetadata(ctx, tx, row.ExperimentID, row.LogicalTrialID, completion.TrialID, completion.ManifestHash, completion.Manifest, completion.Outcome, completion.WorkerID, row.TrialStatus, completion.RequestHash, completion.IdempotencyKey, completion.Artifacts, completion.Usage, completion.Grades)
 	if err != nil {
 		return scheduler.CommitResult{}, err
 	}
@@ -137,26 +146,27 @@ type commitAttempt struct {
 	Retryable           []string
 	OutcomeManifestHash string
 	FinalResultID       string
+	RequestHash         string
 }
 
 func lockCommitAttempt(ctx context.Context, tx pgx.Tx, trialID string) (commitAttempt, error) {
 	var row commitAttempt
 	var backoffBaseMS, backoffCapMS int64
 	err := tx.QueryRow(ctx, `
-SELECT a.logical_trial_id, l.experiment_id, a.status, COALESCE(a.lease_owner,''), a.lease_token_hash,
+SELECT a.logical_trial_id, l.experiment_id, a.attempt_no, a.status, COALESCE(a.lease_owner,''), a.lease_token_hash,
        COALESCE(a.lease_generation,0), a.event_sequence,
        (a.lease_expires_at IS NOT NULL AND clock_timestamp() < a.lease_expires_at), e.status,
        l.status, l.pair_id, l.arm, a.attempt_no, l.max_attempts, l.backoff_base_ms, l.backoff_cap_ms,
-       l.retryable_categories, COALESCE(a.outcome_manifest_hash,''), COALESCE(l.final_result_id,'')
+       l.retryable_categories, COALESCE(a.outcome_manifest_hash,''), COALESCE(l.final_result_id,''), COALESCE(a.request_hash,'')
 FROM trial_attempts a
 JOIN logical_trials l ON l.logical_trial_id=a.logical_trial_id
 JOIN experiments e ON e.experiment_id=l.experiment_id
 WHERE a.trial_id=$1
 FOR UPDATE OF a, l`, trialID).Scan(
-		&row.LogicalTrialID, &row.ExperimentID, &row.AttemptStatus, &row.Owner, &row.TokenHash,
+		&row.LogicalTrialID, &row.ExperimentID, &row.AttemptNo, &row.AttemptStatus, &row.Owner, &row.TokenHash,
 		&row.Generation, &row.EventSequence, &row.LeaseValid, &row.ExperimentStatus,
 		&row.TrialStatus, &row.PairID, &row.Arm, &row.AttemptNo, &row.MaxAttempts, &backoffBaseMS, &backoffCapMS,
-		&row.Retryable, &row.OutcomeManifestHash, &row.FinalResultID,
+		&row.Retryable, &row.OutcomeManifestHash, &row.FinalResultID, &row.RequestHash,
 	)
 	if err == pgx.ErrNoRows {
 		return commitAttempt{}, &scheduler.Error{Code: scheduler.CodeTrialNotFound, Message: "attempt 不存在"}
@@ -222,13 +232,33 @@ func finalizeLogicalTrial(ctx context.Context, tx pgx.Tx, experimentID, logicalT
 	if err != nil {
 		return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "无法计算 result idempotency key", Cause: err}
 	}
+	return finalizeLogicalTrialWithMetadata(ctx, tx, experimentID, logicalTrialID, trialID, manifestHash, manifest, outcome, actor, from, "", idempotencyKey, nil, nil, nil)
+}
+
+func finalizeLogicalTrialWithMetadata(ctx context.Context, tx pgx.Tx, experimentID, logicalTrialID, trialID, manifestHash string, manifest []byte, outcome scheduler.Outcome, actor string, from scheduler.TrialStatus, requestHash, idempotencyKey string, artifacts, usage, grades []byte) (scheduler.CommitResult, error) {
+	if idempotencyKey == "" {
+		var err error
+		idempotencyKey, err = scheduler.ResultIdempotencyKey(trialID, manifestHash)
+		if err != nil {
+			return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "无法计算 result idempotency key", Cause: err}
+		}
+	}
+	if len(artifacts) == 0 {
+		artifacts = []byte("[]")
+	}
+	if len(usage) == 0 {
+		usage = []byte("{}")
+	}
+	if len(grades) == 0 {
+		grades = []byte("{}")
+	}
 	resultID, err := identity.HashCanonical(map[string]any{"logical_trial_id": logicalTrialID, "trial_id": trialID, "result_manifest_hash": manifestHash})
 	if err != nil {
 		return scheduler.CommitResult{}, &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "无法计算 result ID", Cause: err}
 	}
 	if _, err := tx.Exec(ctx, `
-INSERT INTO trial_results (result_id, logical_trial_id, trial_id, idempotency_key, manifest_hash, manifest, outcome)
-VALUES ($1,$2,$3,$4,$5,$6,$7)`, resultID, logicalTrialID, trialID, idempotencyKey, manifestHash, manifest, outcome); err != nil {
+INSERT INTO trial_results (result_id, logical_trial_id, trial_id, idempotency_key, request_hash, manifest_hash, manifest, artifacts, usage, grades, outcome)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11)`, resultID, logicalTrialID, trialID, idempotencyKey, requestHash, manifestHash, manifest, artifacts, usage, grades, outcome); err != nil {
 		return scheduler.CommitResult{}, wrapDatabaseError("插入 logical result", err)
 	}
 	status := trialStatusForOutcome(outcome)

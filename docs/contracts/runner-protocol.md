@@ -1,6 +1,6 @@
 # Runner Protocol Contract
 
-**状态：** `FUTURE → M3`；`PROPOSED`，目标在 Milestone 1 冻结 v0
+**状态：** `ACCEPTED → M3`；v1（2026-08-25 UTC）
 **用途：** 定义 Go Control Plane 与 Trial Worker 之间的语言无关边界
 
 ## 1. 设计原则
@@ -28,7 +28,7 @@ service RunnerControl {
 }
 ```
 
-实际 `.proto` 在 Contract 冻结后生成；本文件是语义规范，不是最终代码。
+实现来源：[`proto/runner/v1/runner.proto`](../../proto/runner/v1/runner.proto)。本文件定义语义约束；生成代码必须通过脚本 [`scripts/gen-proto.sh`](../../scripts/gen-proto.sh) 更新。
 
 ## 3. Worker 注册
 
@@ -146,7 +146,7 @@ Event 采用追加式 Sequence：
 }
 ```
 
-同一 `event_id` 重复上报必须返回已存在结果；Sequence 缺口应产生诊断，不应静默补齐。
+同一 `event_id` 重复上报必须在 Trial 与 Payload Hash 一致时返回已存在结果；身份或 Hash 冲突必须拒绝。Sequence 缺口返回诊断且不得写入，服务端必须将事件持久化到 PostgreSQL 事实来源。
 
 ## 7. Completion
 
@@ -176,7 +176,7 @@ Worker 完成后发送：
 }
 ```
 
-Go Server 必须校验：Lease、Request Hash、Artifact Hash、状态转换、Budget 和 Grader Identity。
+Go Server 必须校验：Session、Lease、Request Hash、Idempotency Key、Artifact Manifest Hash、状态转换、Budget 和 Grader Identity。M3 只实现本地 Artifact 路径的大小与 SHA-256 校验；对象存储和 Grader 留待后续里程碑。
 
 ## 8. 错误码
 

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	leasetoken "github.com/Lin-xun1113/SkillGate/internal/lease"
@@ -10,6 +11,10 @@ import (
 )
 
 func (s *Store) Claim(ctx context.Context, workerID string, leaseDuration time.Duration) (scheduler.Claim, error) {
+	return s.ClaimFiltered(ctx, workerID, leaseDuration, scheduler.ClaimFilter{})
+}
+
+func (s *Store) ClaimFiltered(ctx context.Context, workerID string, leaseDuration time.Duration, filter scheduler.ClaimFilter) (scheduler.Claim, error) {
 	if workerID == "" || leaseDuration <= 0 {
 		return scheduler.Claim{}, &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "worker ID 和 lease duration 必须有效"}
 	}
@@ -30,6 +35,7 @@ func (s *Store) Claim(ctx context.Context, workerID string, leaseDuration time.D
 SELECT e.experiment_id
 FROM experiments e
 WHERE e.status IN ('QUEUED','RUNNING') AND clock_timestamp() < e.budget_deadline_at
+  AND ($1 = '' OR e.experiment_id = $1)
   AND EXISTS (
     SELECT 1 FROM logical_trials l
     JOIN trial_attempts a ON a.logical_trial_id=l.logical_trial_id
@@ -37,7 +43,7 @@ WHERE e.status IN ('QUEUED','RUNNING') AND clock_timestamp() < e.budget_deadline
       AND a.status='PENDING' AND a.not_before <= clock_timestamp()
   )
 ORDER BY e.created_at, e.experiment_id
-LIMIT 1`).Scan(&claim.ExperimentID)
+LIMIT 1`, filter.PreferredExperimentID).Scan(&claim.ExperimentID)
 	if err == pgx.ErrNoRows {
 		return scheduler.Claim{}, &scheduler.Error{Code: scheduler.CodeNotClaimable, Message: "当前没有可领取的 attempt"}
 	}
@@ -48,7 +54,7 @@ LIMIT 1`).Scan(&claim.ExperimentID)
 		return scheduler.Claim{}, err
 	}
 	err = tx.QueryRow(ctx, `
-SELECT a.trial_id, a.logical_trial_id, a.attempt_no, l.timeout_ms, e.budget_deadline_at
+SELECT a.trial_id, a.logical_trial_id, a.attempt_no, l.timeout_ms, e.budget_deadline_at, l.pair_id, l.arm
 FROM trial_attempts a
 JOIN logical_trials l ON l.logical_trial_id=a.logical_trial_id
 JOIN experiments e ON e.experiment_id=l.experiment_id
@@ -58,7 +64,7 @@ WHERE e.experiment_id=$1 AND a.status='PENDING' AND a.not_before <= clock_timest
   AND clock_timestamp() < e.budget_deadline_at
 ORDER BY a.priority DESC, a.not_before, a.created_at, a.trial_id
 FOR UPDATE OF a SKIP LOCKED
-LIMIT 1`, claim.ExperimentID).Scan(&claim.TrialID, &claim.LogicalTrialID, &claim.Attempt, &timeoutMS, &budgetDeadline)
+LIMIT 1`, claim.ExperimentID).Scan(&claim.TrialID, &claim.LogicalTrialID, &claim.Attempt, &timeoutMS, &budgetDeadline, &claim.PairID, &claim.Arm)
 	if err == pgx.ErrNoRows {
 		return scheduler.Claim{}, &scheduler.Error{Code: scheduler.CodeNotClaimable, Message: "当前 experiment 的可领取 attempt 已被其他 Scheduler 获取"}
 	}
@@ -95,6 +101,13 @@ WHERE trial_id=$1 AND status='PENDING'
 RETURNING lease_expires_at, deadline_at`, claim.TrialID, workerID, token.Hash, generation, timeoutMS, leaseDuration.Milliseconds(), budgetDeadline).Scan(&claim.LeaseExpiresAt, &claim.Deadline); err != nil {
 		return scheduler.Claim{}, wrapDatabaseError("更新 attempt lease", err)
 	}
+	requestHash, err := scheduler.TrialRequestHash(claim.ExperimentID, claim.LogicalTrialID, claim.TrialID, claim.PairID, claim.Arm, claim.Attempt)
+	if err != nil {
+		return scheduler.Claim{}, &scheduler.Error{Code: scheduler.CodeIdentityConflict, Message: "无法计算 trial request hash", Cause: err}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE trial_attempts SET request_hash=$2 WHERE trial_id=$1`, claim.TrialID, requestHash); err != nil {
+		return scheduler.Claim{}, wrapDatabaseError("保存 trial request hash", err)
+	}
 	if _, err := tx.Exec(ctx, `UPDATE logical_trials SET status='LEASED', lease_generation=$2, updated_at=clock_timestamp() WHERE logical_trial_id=$1`, claim.LogicalTrialID, generation); err != nil {
 		return scheduler.Claim{}, wrapDatabaseError("更新 logical trial lease", err)
 	}
@@ -125,8 +138,21 @@ func (s *Store) Heartbeat(ctx context.Context, heartbeat scheduler.Heartbeat, le
 	return s.updateLease(ctx, heartbeat, leaseDuration, false)
 }
 
+// HeartbeatWithResult returns the timestamp computed by PostgreSQL after the
+// renewal. It is an optional extension of QueueStore for protocol callers.
+func (s *Store) HeartbeatWithResult(ctx context.Context, heartbeat scheduler.Heartbeat, leaseDuration time.Duration) (scheduler.HeartbeatResult, error) {
+	if err := s.Heartbeat(ctx, heartbeat, leaseDuration); err != nil {
+		return scheduler.HeartbeatResult{}, err
+	}
+	var expires time.Time
+	if err := s.pool.QueryRow(ctx, `SELECT lease_expires_at FROM trial_attempts WHERE trial_id=$1`, heartbeat.TrialID).Scan(&expires); err != nil {
+		return scheduler.HeartbeatResult{}, wrapDatabaseError("读取 lease 到期时间", err)
+	}
+	return scheduler.HeartbeatResult{LeaseExpiresAt: expires.UTC()}, nil
+}
+
 func (s *Store) updateLease(ctx context.Context, heartbeat scheduler.Heartbeat, leaseDuration time.Duration, start bool) error {
-	if heartbeat.TrialID == "" || heartbeat.WorkerID == "" || heartbeat.LeaseToken == "" || heartbeat.LeaseGeneration < 1 || heartbeat.EventSequence < 0 {
+	if heartbeat.TrialID == "" || heartbeat.WorkerID == "" || heartbeat.LeaseToken == "" || heartbeat.EventSequence < 0 {
 		return &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "lease 请求字段不完整"}
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
@@ -149,7 +175,7 @@ func (s *Store) updateLease(ctx context.Context, heartbeat scheduler.Heartbeat, 
 	if row.Owner != heartbeat.WorkerID {
 		return &scheduler.Error{Code: scheduler.CodeOwnerMismatch, Message: "lease owner 不匹配"}
 	}
-	if row.Generation != heartbeat.LeaseGeneration || !leasetoken.Matches(row.TokenHash, heartbeat.LeaseToken) {
+	if (heartbeat.LeaseGeneration > 0 && row.Generation != heartbeat.LeaseGeneration) || !leasetoken.Matches(row.TokenHash, heartbeat.LeaseToken) {
 		return &scheduler.Error{Code: scheduler.CodeLeaseMismatch, Message: "lease token 或 fence 不匹配"}
 	}
 	if !row.LeaseValid {
@@ -161,6 +187,10 @@ func (s *Store) updateLease(ctx context.Context, heartbeat scheduler.Heartbeat, 
 	if heartbeat.EventSequence < row.EventSequence {
 		return &scheduler.Error{Code: scheduler.CodeStatusConflict, Message: "event sequence 不能回退"}
 	}
+	usageJSON, err := json.Marshal(heartbeat.Usage)
+	if err != nil {
+		return &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "resource usage 无法序列化", Cause: err}
+	}
 
 	if start {
 		if row.AttemptStatus == scheduler.AttemptRunning && heartbeat.EventSequence == row.EventSequence {
@@ -170,8 +200,8 @@ func (s *Store) updateLease(ctx context.Context, heartbeat scheduler.Heartbeat, 
 			return &scheduler.Error{Code: scheduler.CodeStatusConflict, Message: "attempt 不是 LEASED"}
 		}
 		if _, err := tx.Exec(ctx, `
-UPDATE trial_attempts SET status='RUNNING', started_at=COALESCE(started_at,clock_timestamp()), event_sequence=$2, phase=$3, updated_at=clock_timestamp()
-WHERE trial_id=$1`, heartbeat.TrialID, heartbeat.EventSequence, nullablePhase(heartbeat.Phase)); err != nil {
+UPDATE trial_attempts SET status='RUNNING', started_at=COALESCE(started_at,clock_timestamp()), event_sequence=$2, phase=$3, usage=$4, updated_at=clock_timestamp()
+WHERE trial_id=$1`, heartbeat.TrialID, heartbeat.EventSequence, nullablePhase(heartbeat.Phase), usageJSON); err != nil {
 			return wrapDatabaseError("启动 attempt", err)
 		}
 		if _, err := tx.Exec(ctx, `UPDATE logical_trials SET status='RUNNING', updated_at=clock_timestamp() WHERE logical_trial_id=$1`, row.LogicalTrialID); err != nil {
@@ -188,8 +218,8 @@ WHERE trial_id=$1`, heartbeat.TrialID, heartbeat.EventSequence, nullablePhase(he
 UPDATE trial_attempts
 SET heartbeat_at=clock_timestamp(),
     lease_expires_at=LEAST(clock_timestamp()+($2 * interval '1 millisecond'), deadline_at),
-    event_sequence=$3, phase=$4, updated_at=clock_timestamp()
-WHERE trial_id=$1`, heartbeat.TrialID, leaseDuration.Milliseconds(), heartbeat.EventSequence, nullablePhase(heartbeat.Phase)); err != nil {
+    event_sequence=$3, phase=$4, usage=$5, updated_at=clock_timestamp()
+WHERE trial_id=$1`, heartbeat.TrialID, leaseDuration.Milliseconds(), heartbeat.EventSequence, nullablePhase(heartbeat.Phase), usageJSON); err != nil {
 			return wrapDatabaseError("续租 attempt", err)
 		}
 	}
@@ -202,6 +232,7 @@ WHERE trial_id=$1`, heartbeat.TrialID, leaseDuration.Milliseconds(), heartbeat.E
 type lockedAttempt struct {
 	LogicalTrialID   string
 	ExperimentID     string
+	AttemptNo        int
 	AttemptStatus    scheduler.AttemptStatus
 	Owner            string
 	TokenHash        []byte
@@ -214,7 +245,7 @@ type lockedAttempt struct {
 func lockAttempt(ctx context.Context, tx pgx.Tx, trialID string) (lockedAttempt, error) {
 	var row lockedAttempt
 	err := tx.QueryRow(ctx, `
-SELECT a.logical_trial_id, l.experiment_id, a.status, COALESCE(a.lease_owner,''), a.lease_token_hash,
+SELECT a.logical_trial_id, l.experiment_id, a.attempt_no, a.status, COALESCE(a.lease_owner,''), a.lease_token_hash,
        COALESCE(a.lease_generation,0), a.event_sequence,
        (a.lease_expires_at IS NOT NULL AND clock_timestamp() < a.lease_expires_at), e.status
 FROM trial_attempts a
@@ -222,7 +253,7 @@ JOIN logical_trials l ON l.logical_trial_id=a.logical_trial_id
 JOIN experiments e ON e.experiment_id=l.experiment_id
 WHERE a.trial_id=$1
 FOR UPDATE OF a, l`, trialID).Scan(
-		&row.LogicalTrialID, &row.ExperimentID, &row.AttemptStatus, &row.Owner, &row.TokenHash,
+		&row.LogicalTrialID, &row.ExperimentID, &row.AttemptNo, &row.AttemptStatus, &row.Owner, &row.TokenHash,
 		&row.Generation, &row.EventSequence, &row.LeaseValid, &row.ExperimentStatus,
 	)
 	if err == pgx.ErrNoRows {

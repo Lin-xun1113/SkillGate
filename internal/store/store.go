@@ -20,3 +20,15 @@ type QueueStore interface {
 	CancelExperiment(context.Context, string, string, string) (scheduler.CancelResult, error)
 	Close()
 }
+
+type FilteredClaimStore interface {
+	ClaimFiltered(context.Context, string, time.Duration, scheduler.ClaimFilter) (scheduler.Claim, error)
+}
+
+type EventStore interface {
+	ReportEvent(context.Context, scheduler.Event) (scheduler.EventResult, error)
+}
+
+type HeartbeatResultStore interface {
+	HeartbeatWithResult(context.Context, scheduler.Heartbeat, time.Duration) (scheduler.HeartbeatResult, error)
+}

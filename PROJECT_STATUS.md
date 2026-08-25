@@ -1,8 +1,8 @@
 # SkillGate 项目状态
 
 **最后更新：** 2026-08-25（UTC）  
-**阶段：** M0、M1 已完成并归档；M2 已确认 Shape 并进入 Build 阶段，尚未通过独立 Verify。
-**实现状态：** Go Module、Canonical Identity、文件系统 CAS、Manifest Compiler、CLI 和 Contract Tests 已建立；M2 Build 候选已新增 PostgreSQL Migration、Queue/Lease、Retry、幂等 Result Commit、取消和真实 PostgreSQL 故障测试。M2 的验收结论仍由 Native 独立 Verifier 决定。
+**阶段：** M0、M1、M2 已完成并归档；M3 Runner Protocol 与 Fixture Worker 已完成当前 Build 候选，正在等待 Native Verify，尚未归档。
+**实现状态：** Go Module、Canonical Identity、文件系统 CAS、Manifest Compiler、CLI、M2 PostgreSQL Queue/Lease/Retry/幂等 Commit，以及 M3 gRPC/Protobuf、Session/Capability、Request Hash、Heartbeat、PostgreSQL Event、幂等 Result、Python Fixture Worker 和 Compose Bootstrap 已建立。M3 的真实 PostgreSQL、Python 和 Compose 检查已通过；独立 Verify 结论仍以 Comet Runtime 为准。
 
 ### M1 暂停原因与修复
 
@@ -114,10 +114,9 @@ M2 已在 Shape 冻结 PostgreSQL Queue/Lease、Logical Trial/Attempt Identity�
 ## 下一次会话清单
 
 1. ✅ M1 已归档并合并到 master（2026-08-25）。
-2. ✅ M2 Shape 已确认，用户冻结 Logical Trial/Attempt、严格过期 Fence、两阶段取消和 CLI + Fixture（2026-08-25）。
-3. ▶️ 提交 M2 Builder handoff，运行 Native 独立 Verify；若未通过，按最新 continuation 回到 Build 修复。
-4. ⏳ Verify 通过后才可将 M2 变更标为完成并归档；在此之前不得声称 M2 已实现。
-5. Python Worker 仍按实施计划在 M3/M4 引入。
+2. ✅ M2 已归档并合并到当前目标分支（2026-08-25）。
+3. ▶️ 提交 M3 Builder handoff，运行 Native 独立 Verify；若未通过，按最新 continuation 回到 Build 修复。
+4. ⏳ M3 Verify 通过并归档后，才进入 M4 LangGraph Worker 与 Sandbox；当前不得开始 M4。
 
 ## 明确延期的事项
 
