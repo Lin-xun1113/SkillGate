@@ -85,4 +85,5 @@ SkillGate 是一个 **Go-first 的 Agent Strategy 评估与晋级平台**。它�
 - 如果当前请求未明确调用 Comet Skill，且 probe 返回 `out_of_scope` 或 `none`，不要进入 Comet workflow。
 - 如果配置或状态无效且没有 `nextCommand`，停止并报告原因；不要猜测另一个 workflow。
 - 不能只因为存在 active change 就把无关任务挂到该 change。Native 的未提交改动由 Native 入口检查，不由探针自动归因。
+- Subagent默认调用DeepSeek V4 Flash
 </comet-ambient-resume>
