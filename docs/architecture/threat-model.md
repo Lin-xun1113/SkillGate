@@ -1,6 +1,6 @@
 # 威胁模型
 
-**状态：** `ACCEPTED` 基线；在执行真实不可信代码前必须继续细化 Security Implementation
+**状态：** `FUTURE → M3`；`ACCEPTED` 基线；在执行真实不可信代码前必须继续细化
 
 ## 1. 需要保护的资产
 

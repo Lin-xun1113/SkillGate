@@ -1,6 +1,6 @@
 # 成功指标与 Release Criteria
 
-**状态：** `PROPOSED`，作为 MVP 基线；阈值是校准用默认值，不是普适规律。
+**状态：** `FUTURE → M5`；`PROPOSED`，作为 MVP 基线
 
 ## 1. 为什么需要多个指标
 

@@ -1,6 +1,6 @@
 # Strategy Engine 设计
 
-**状态：** 方向已 `ACCEPTED`；CEL Schema 在第一次实现前仍为临时方案
+**状态：** `FUTURE → M6`；方向已 `ACCEPTED`；CEL Schema 在第一次实现前仍为临时方案
 
 ## 1. 目的
 

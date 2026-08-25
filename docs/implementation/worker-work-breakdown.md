@@ -1,6 +1,6 @@
 # Python/LangGraph Worker 工作拆解
 
-**状态：** `PROPOSED`，用于 M3–M5
+**状态：** `FUTURE → M3`；`PROPOSED`，用于 M3–M5
 
 ## 1. Worker 目标
 

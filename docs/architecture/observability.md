@@ -1,6 +1,6 @@
 # 可观测性架构
 
-**状态：** `ACCEPTED`，用于 MVP
+**状态：** `FUTURE → M4`；`ACCEPTED`，用于 MVP
 
 ## 1. 可观测性目标
 

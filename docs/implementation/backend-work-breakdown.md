@@ -1,6 +1,6 @@
 # Go Backend 工作拆解
 
-**状态：** `PROPOSED`，用于 M1–M7
+**状态：** `FUTURE`；`PROPOSED`，用于 M1–M7；M1 代码已部分偏离，需在 M1 归档后重新对齐
 
 ## 1. 推荐目录边界
 

@@ -52,6 +52,24 @@ SkillGate 是一个 **Go-first 的 Agent Strategy 评估与晋级平台**。它�
 
 一个功能不能只因为 Happy Path 能运行就算完成。它必须同时包含相关契约、失败行为、幂等行为、可观测字段、测试，以及对项目状态或里程碑记录的更新。
 
+### 里程碑裁剪
+
+对早期纵向切片（M1、M2 等），上述完成定义可由 change scope 显式声明裁剪范围。裁剪必须在 brief.md 的 Non-goals 或 Constraints 中说明，并通过 Shape 确认。
+
+允许裁剪的维度：
+
+- **幂等行为**：如果当前里程碑不涉及 Result Commit 或重试逻辑，幂等要求可延后；
+- **可观测字段**：如果当前里程碑不涉及生产级遥测，可观测字段可简化为 CLI 输出或日志；
+- **失败行为**：如果当前里程碑只处理确定性输入，部分非预期失败路径可延后；
+- **契约**：如果当前里程碑只提供 CLI 而非 API，API Contract 可延后。
+
+不允许裁剪的维度：
+
+- **测试**：即使是最小切片，也必须有对应的测试覆盖；
+- **项目状态更新**：每个里程碑完成后必须更新 PROJECT_STATUS.md。
+
+裁剪决策应记录在对应 change 的 brief.md 中。
+
 <comet-ambient-resume>
 <!-- Managed by Comet. Edits inside this block may be replaced by comet init/update. -->
 <!-- Contract: comet.resume_probe.v2 -->

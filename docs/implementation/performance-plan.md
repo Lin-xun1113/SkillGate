@@ -1,6 +1,6 @@
 # 性能与容量验证计划
 
-**状态：** `PROPOSED`；所有目标数值需在第一轮 Benchmark 后校准
+**状态：** `FUTURE → M4`；`PROPOSED`；所有目标数值需在第一轮 Benchmark 后校准
 
 ## 1. 为什么要单独做性能计划
 
