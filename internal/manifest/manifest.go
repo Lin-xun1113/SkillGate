@@ -12,12 +12,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type RuntimePolicy struct {
+	AttemptTimeoutSeconds int      `json:"attempt_timeout_seconds"`
+	MaxAttempts           int      `json:"max_attempts"`
+	RetryableCategories   []string `json:"retryable_categories"`
+}
+
 type CompiledExperiment struct {
 	ManifestHash string                  `json:"manifest_hash"`
 	SuiteHash    string                  `json:"suite_hash"`
 	Pairing      map[string]string       `json:"pairing"`
 	PairCount    int                     `json:"pair_count"`
 	TrialCount   int                     `json:"trial_count"`
+	Runtime      RuntimePolicy           `json:"runtime"`
 	Pairs        []experiment.PairPlan   `json:"pairs"`
 	Diagnostics  []validation.Diagnostic `json:"diagnostics"`
 }
@@ -368,7 +375,21 @@ func CompileWithDependencies(manifestPath, projectRoot string, resolver Referenc
 	caseList, _ := suite["spec"].(map[string]any)
 	cases, _ := caseList["cases"].([]any)
 	sort.Slice(cases, func(i, j int) bool { return caseID(cases[i]) < caseID(cases[j]) })
-	plan := &CompiledExperiment{ManifestHash: manifestHash, SuiteHash: suiteHash, Pairing: map[string]string{"treatment": "skill_version", "baseline_arm": "without_skill", "candidate_arm": "with_skill"}, Diagnostics: []validation.Diagnostic{}, Pairs: make([]experiment.PairPlan, 0)}
+	runtimePolicy := RuntimePolicy{AttemptTimeoutSeconds: timeoutSeconds, MaxAttempts: 1}
+	if retryConfig, ok := baseline["retry"].(map[string]any); ok {
+		runtimePolicy.MaxAttempts = intValue(retryConfig["maxAttempts"])
+		if runtimePolicy.MaxAttempts < 1 {
+			runtimePolicy.MaxAttempts = 1
+		}
+		if values, ok := retryConfig["retryableCategories"].([]any); ok {
+			for _, value := range values {
+				if category, ok := value.(string); ok {
+					runtimePolicy.RetryableCategories = append(runtimePolicy.RetryableCategories, strings.ToUpper(category))
+				}
+			}
+		}
+	}
+	plan := &CompiledExperiment{ManifestHash: manifestHash, SuiteHash: suiteHash, Pairing: map[string]string{"treatment": "skill_version", "baseline_arm": "without_skill", "candidate_arm": "with_skill"}, Runtime: runtimePolicy, Diagnostics: []validation.Diagnostic{}, Pairs: make([]experiment.PairPlan, 0)}
 	for _, raw := range cases {
 		item, ok := raw.(map[string]any)
 		if !ok {

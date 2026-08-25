@@ -14,6 +14,12 @@ func TestCompileM0ManifestProducesDeterministicPlan(t *testing.T) {
 	if compiled.PairCount != 24 || compiled.TrialCount != 48 {
 		t.Fatalf("counts = %d/%d, want 24/48", compiled.PairCount, compiled.TrialCount)
 	}
+	if compiled.Runtime.AttemptTimeoutSeconds != 60 || compiled.Runtime.MaxAttempts != 2 {
+		t.Fatalf("runtime policy = %#v", compiled.Runtime)
+	}
+	if len(compiled.Runtime.RetryableCategories) != 2 || compiled.Runtime.RetryableCategories[0] != "PROVIDER_TRANSIENT" || compiled.Runtime.RetryableCategories[1] != "WORKER_LOST" {
+		t.Fatalf("runtime retry categories = %#v", compiled.Runtime.RetryableCategories)
+	}
 	if compiled.Pairs[0].Trials[0].Arm != "without_skill" || compiled.Pairs[0].Trials[1].Arm != "with_skill" {
 		t.Fatalf("arm ordering = %#v", compiled.Pairs[0].Trials)
 	}

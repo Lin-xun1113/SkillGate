@@ -1,6 +1,6 @@
 # 存储与数据架构
 
-**状态：** `FUTURE → M2`；`ACCEPTED`，用于 MVP
+**状态：** `PROVISIONAL → M2`；2026-08-25（UTC）Build 候选，等待 Native Verify
 
 ## 1. 存储分工
 
@@ -35,7 +35,7 @@ Canonicalization 规则必须集中实现并测试：
 
 ## 3. PostgreSQL 逻辑表
 
-初始 Schema 至少包含：
+M2 Build 候选首先实现以下生命周期表；Registry、Artifact、Grade、Metric 和 Worker 表留给后续里程碑。完整目标表清单如下：
 
 ```text
 skills
@@ -69,24 +69,27 @@ outbox_events（第一个纵向切片完成后再决定是否加入）
 - 有访问依据的 Index；
 - 用于生命周期约束的 Foreign Key。
 
-## 4. 关键 Index
+## 4. M2 关键 Index
 
-以下是临时设计：
+M2 Build 候选 Migration 实现以下等价 Index；性能结论仍需 Native Verify 使用代表性数据量检查：
 
 ```sql
-CREATE INDEX trials_claim_idx
-  ON trials (priority DESC, created_at, id)
+CREATE INDEX trial_attempts_claim_idx
+  ON trial_attempts (priority DESC, not_before, created_at, trial_id)
   WHERE status = 'PENDING';
 
-CREATE INDEX trials_lease_expiry_idx
-  ON trials (lease_expires_at)
+CREATE INDEX trial_attempts_expiry_idx
+  ON trial_attempts (lease_expires_at, trial_id)
   WHERE status IN ('LEASED', 'RUNNING');
 
-CREATE UNIQUE INDEX trial_logical_identity_uq
-  ON trials (experiment_id, case_id, arm, repetition);
+CREATE UNIQUE INDEX logical_trial_identity_uq
+  ON logical_trials (experiment_id, pair_id, arm);
+
+CREATE UNIQUE INDEX result_logical_uq
+  ON trial_results (logical_trial_id);
 
 CREATE UNIQUE INDEX result_idempotency_uq
-  ON trial_attempts (trial_id, idempotency_key);
+  ON trial_results (idempotency_key);
 ```
 
 在声称性能指标前，必须用代表性数据量执行 `EXPLAIN (ANALYZE, BUFFERS)` 验证。
@@ -124,9 +127,9 @@ CREATE UNIQUE INDEX result_idempotency_uq
 
 Control Plane 必须校验 Size 和 Hash，并拒绝路径穿越或由用户直接控制的绝对 Storage Key。
 
-## 7. Event Sourcing 边界
+## 7. M2 Event/State 边界
 
-MVP 不采用完全 Event-sourced 架构。PostgreSQL State 是权威状态，Event 是追加式 Audit Record。条件允许时，State Transition 和对应 Domain Event 应在同一个事务中提交。Telemetry Span 不是 Domain Event。
+MVP 不采用完全 Event-sourced 架构。PostgreSQL State 是权威状态，`trial_transition_events` 是追加式 Audit Record。M2 在同一事务提交 State Transition、Result 和对应 Audit Event；Telemetry Span 不是 Domain Event。M2 使用 `logical_trials`、`trial_attempts` 和 `trial_results` 表表达 Retry 组、Attempt 与最终 Result。
 
 ## 8. 数据生命周期
 

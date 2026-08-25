@@ -236,7 +236,15 @@ trial_identity = canonical_json({pair_id, arm, attempt})
 trial_id = sha256(trial_identity)
 ```
 
-`attempt` 只表示同一 Logical Trial 的至少一次执行尝试，不能改变 `pair_id`；Result Commit 使用 `sha256(canonical_json({trial_id, result_manifest_hash}))` 作为 Idempotency Key。M0 只生成 `identity-examples.json` 的离线契约 Fixture 和校验，不声称已实现 Runtime Materialization 或 Result Commit。
+`attempt` 只表示同一 Logical Trial 的至少一次执行尝试，不能改变 `pair_id`。M2 将 Logical Trial Identity 明确定义为：
+
+```text
+logical_trial_id = sha256(canonical_json({pair_id, arm}))
+trial_id = sha256(canonical_json({pair_id, arm, attempt}))
+result_idempotency_key = sha256(canonical_json({trial_id, result_manifest_hash}))
+```
+
+M1 只生成 Attempt 1 的 `trial_id`；M2 物化时新增稳定 Logical Trial 记录，Retry 创建新的 Attempt，并保证一个 Logical Trial 只有一个最终 Result。M0 只生成 `identity-examples.json` 的离线契约 Fixture 和校验，不声称已实现 Runtime Materialization 或 Result Commit。
 实际 ID 可以使用可读前缀加 Hash，例如：
 
 ```text

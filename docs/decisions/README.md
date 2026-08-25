@@ -9,5 +9,6 @@
 - `ADR-005-security-as-hard-gate.md`
 - `ADR-006-trigger-and-answer-populations.md`
 - `ADR-007-m0-csv-analysis-workload.md`
+- `ADR-009-m2-postgresql-scheduler-reliability.md`
 
 新决策使用 `docs/templates/adr.md`。状态只有在实现和测试验证后才能改为 `IMPLEMENTED`。

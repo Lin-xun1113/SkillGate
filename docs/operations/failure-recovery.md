@@ -1,6 +1,6 @@
 # 故障恢复手册
 
-**状态：** `FUTURE → M2`；`PROPOSED`，用于 M2 以后实现
+**状态：** `PROVISIONAL → M2`；2026-08-25（UTC）Build 候选，等待 Native Verify
 
 ## 1. 恢复原则
 
@@ -10,7 +10,7 @@
 - 任何人工动作都记录 Actor、原因、时间和影响范围；
 - 无法确认的数据保持 `INCOMPLETE`。
 
-## 2. Worker 崩溃
+## 2. M2 Worker/Fixture 崩溃
 
 现象：Trial 长时间处于 `LEASED`/`RUNNING`。
 
@@ -21,7 +21,7 @@
 3. 等待 Expiry Sweeper；
 4. 检查是否存在已上传但未 Commit 的 Artifact；
 5. 按 Retry Policy 进入 `RETRY_WAIT` 或 `FAILED`；
-6. 检查旧 Worker 的迟到 Completion 是否被正确拒绝/去重；
+6. 检查旧 Worker 的迟到 Completion 是否返回 `LEASE_EXPIRED`；只有 Lease 有效期间已经提交但响应丢失的同一 Completion 才返回幂等成功；
 7. 记录故障注入或真实故障 Evidence。
 
 ## 3. PostgreSQL 中断
@@ -47,11 +47,14 @@
 
 ## 5. Result 重复提交
 
-正确行为：
+M2 正式行为：
 
-- 相同 Trial + 相同 Idempotency Key：返回已存在结果；
-- 相同 Trial + 不同 Result Hash：返回 Conflict，并产生 Audit Event；
-- 已 Terminal Trial 收到新 Completion：不能修改原 Result。
+- 相同 Attempt + 相同 Result Hash：返回已存在结果并标记 `idempotent=true`；
+- 相同 Attempt + 不同 Result Hash：返回 `RESULT_CONFLICT`，产生 Audit Event，不覆盖；
+- Lease 已过期：返回 `LEASE_EXPIRED`，不写 Result、不计数；
+- 已 Terminal Logical Trial 收到其他 Attempt Completion：返回 `LOGICAL_TRIAL_TERMINAL`，不能修改原 Result。
+
+不要通过直接修改数据库 Row 让页面变绿；使用 `skillgate scheduler sweep` 和可审计 CLI 恢复。
 
 ## 6. 指标不一致
 

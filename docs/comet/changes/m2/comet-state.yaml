@@ -1,0 +1,442 @@
+schema: comet.native.v4
+name: m2
+language: zh-CN
+phase: archive
+status: active
+state_version: 9
+brief: brief.md
+spec_changes:
+  - capability: scheduler-reliability-core
+    operation: create
+    source: specs/scheduler-reliability-core/spec.md
+workspace:
+  isolation: worktree
+  change_branch: comet/m2
+  target_branch: master
+  finish: merge
+loop:
+  stage: archive-ready
+  goal_cycle: 1
+  iteration: 1
+  attempt: 2
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: archive
+acceptance:
+  - id: A1
+    source: brief.md
+    text: A1：版本化 Migration 能在真实 PostgreSQL 空库上升级到 M2 Schema，重复执行保持幂等；Go Module
+      可构建，`go test ./...` 与静态检查通过。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: A2：M1 编译出的 Pair/Arm/Repetition 能按 `logical_trial_id=hash(pair_id,
+      arm)`、`trial_id=hash(pair_id, arm, attempt)` 原子物化；重复物化不生成重复执行单元，也不改变 Pair
+      Identity。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: A3：两个或更多 Scheduler 并发领取大量 `PENDING` 工作时，`FOR UPDATE SKIP LOCKED` 不会把同一可执行
+      Attempt 同时交给两个 Owner；每次 Claim 返回新的 Lease Token/Fence 与 UTC Expiry。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: A4：合法 Owner 可从 Lease 进入 Running 并续租；错误 Token、错误 Owner、终态任务或已失效 Lease 的
+      Heartbeat/状态转换被稳定拒绝且不改变数据库。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: A5：Worker 领取后退出时，过期回收会按最终 Retry Contract 进入等待并在到期后重试；Backoff 有界、可测试，超过最大
+      Attempt/Budget 后只进入一个确定终态。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: A6：同一 Completion 连续提交三次只保存一个 Result、只终结一次 Logical Trial、只对 Experiment
+      Counter 贡献一次；相同身份但不同内容返回稳定冲突且不覆盖既有结果。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: A7：Worker 完成工作但提交前退出时可以安全重发；Lease 到期后旧 Worker 的迟到提交一律返回稳定的
+      `LEASE_EXPIRED`，不写 Result、不覆盖新 Owner，也不产生计数。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A8
+    source: brief.md
+    text: A8：Experiment 取消先进入可观察的 `CANCEL_REQUESTED` 并停止新 Claim，已 Lease/Running
+      工作确认取消或 Lease 到期后收敛到 `CANCELLED`；重复取消幂等，Scheduler 关闭不会留下不可恢复的中间提交。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A9
+    source: brief.md
+    text: A9：`skillgate` CLI + Fixture/Fault Harness
+      提供版本化成功/错误结果，可脚本化演示迁移、物化、领取、续租、完成、取消和回收，不要求 REST、Python Worker 或外部
+      Credential。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+  - id: A10
+    source: brief.md
+    text: A10：真实 PostgreSQL 故障测试覆盖领取后崩溃、Model Call 后提交前崩溃、三次重复 Completion、多 Worker
+      并发、Experiment 中途取消和旧 Lease 迟到提交；正式 Contract、ADR、运行文档、README 与
+      PROJECT_STATUS 与实现一致。
+    result: passed
+    reason:
+      text: "User confirmed degraded completion without independent semantic
+        verification: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。"
+      truncated: false
+builder_handoff:
+  candidate_id: ad4af19e-a937-46ed-b340-ad5a301f46d5
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:8f9b04ff-53bf-40d2-8bb0-2aec3eaa9262
+  iteration: 1
+  summary:
+    text: 本轮实现 M2 PostgreSQL Scheduler 与可靠性核心候选：新增 pgx/v5 + goose/v3 嵌入式 SQL
+      Migration、PostgreSQL Store/Queue 边界、Logical Trial/Attempt Identity、Lease
+      Token Hash/Fence、FOR UPDATE SKIP LOCKED Claim、Start/Heartbeat、Expiry
+      Sweeper、Retry/Full Jitter、时间预算、Result Idempotent
+      Commit、严格过期拒绝、两阶段取消、Experiment Counter、审计 Transition Event 和 skillgate CLI
+      + Fixture/Fault Harness。同步了 M2 Spec、Scheduler
+      Contract、ADR-009、生命周期/存储/运维/README/PROJECT_STATUS；M1 Golden Identity 与 M0
+      归档未修改。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+    - A10
+  checks:
+    - name:
+        text: go test ./... with TEST_DATABASE_URL
+        truncated: false
+      result: passed
+      note:
+        text: 真实 PostgreSQL 17.11；包含 CLI 与 Store 集成测试
+        truncated: false
+    - name:
+        text: go test -race ./... with TEST_DATABASE_URL
+        truncated: false
+      result: passed
+      note:
+        text: 真实 PostgreSQL 并发/竞态测试
+        truncated: false
+    - name:
+        text: go vet ./...
+        truncated: false
+      result: passed
+      note: null
+    - name:
+        text: gofmt and git diff --check
+        truncated: false
+      result: passed
+      note: null
+    - name:
+        text: npm run validate:m0
+        truncated: false
+      result: passed
+      note:
+        text: M0 Fixture/Hash/Contract 回归
+        truncated: false
+    - name:
+        text: go run ./cmd/skillgate --help
+        truncated: false
+      result: passed
+      note:
+        text: 包含 M2 db/experiment/trial/scheduler 命令
+        truncated: false
+    - name:
+        text: M0 compile JSON smoke
+        truncated: false
+      result: passed
+      note:
+        text: 24 Pair / 48 Trial；Runtime max_attempts=2
+        truncated: false
+    - name:
+        text: PostgreSQL migration and CLI lifecycle
+        truncated: false
+      result: passed
+      note:
+        text: Migration、Materialize、Claim、Start、Complete、JSON Envelope
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: M2 仍未经过 Native 独立 Verifier；不得在 Verify 前宣称 M2 已完成或归档。
+      truncated: false
+    - text: 真实 Worker/gRPC、REST、Model、Sandbox、Artifact Store、Grading、Metrics、Report 和
+        Release Gate 留给后续里程碑。
+      truncated: false
+    - text: 当前本机测试使用 Docker PostgreSQL 17.11 与 Synthetic Credential；测试依赖
+        TEST_DATABASE_URL 或等价真实 PostgreSQL。
+      truncated: false
+    - text: M2 CLI 是当前里程碑的可脚本化入口，不是已稳定的长期 REST API Contract。
+      truncated: false
+  known_limits_truncated: false
+  submitted_at: 2026-08-25T09:47:36.406Z
+blockers: []
+verification:
+  candidate_id: ad4af19e-a937-46ed-b340-ad5a301f46d5
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:1d54b26c-c03e-44d7-8e96-e787a32d290c
+  iteration: 1
+  attempt: 2
+  assurance: user-confirmed-degraded
+  verdict: pass
+  checks:
+    - id: go-test-all-postgres
+      name:
+        text: Go tests with real PostgreSQL
+        truncated: false
+      argv_display:
+        - text: test
+          truncated: false
+        - text: ./...
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 4267
+    - id: go-test-race-postgres
+      name:
+        text: Go race tests with real PostgreSQL
+        truncated: false
+      argv_display:
+        - text: test
+          truncated: false
+        - text: -race
+          truncated: false
+        - text: ./...
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 3994
+    - id: go-vet-all
+      name:
+        text: Go vet
+        truncated: false
+      argv_display:
+        - text: vet
+          truncated: false
+        - text: ./...
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 142
+    - id: m2-postgres-store-faults
+      name:
+        text: M2 PostgreSQL store fault and concurrency tests
+        truncated: false
+      argv_display:
+        - text: test
+          truncated: false
+        - text: -count=1
+          truncated: false
+        - text: ./internal/store/postgres
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 479
+    - id: m2-cli-postgres-lifecycle
+      name:
+        text: M2 CLI PostgreSQL lifecycle test
+        truncated: false
+      argv_display:
+        - text: test
+          truncated: false
+        - text: -count=1
+          truncated: false
+        - text: -run
+          truncated: false
+        - text: TestM2CLIRealPostgresLifecycle
+          truncated: false
+        - text: ./cmd/skillgate
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 488
+    - id: m0-validation
+      name:
+        text: M0 fixture and validation regression
+        truncated: false
+      argv_display:
+        - text: run
+          truncated: false
+        - text: validate:m0
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 232
+    - id: cli-help
+      name:
+        text: SkillGate CLI help
+        truncated: false
+      argv_display:
+        - text: run
+          truncated: false
+        - text: ./cmd/skillgate
+          truncated: false
+        - text: --help
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 97
+    - id: m0-compile
+      name:
+        text: M0 compile regression
+        truncated: false
+      argv_display:
+        - text: run
+          truncated: false
+        - text: ./cmd/skillgate
+          truncated: false
+        - text: compile
+          truncated: false
+        - text: experiments/csv-analysis-v1-demo.yaml
+          truncated: false
+        - text: --json
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 88
+  summary:
+    text: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+      PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+      逐项结论这一限制；确认继续进入 Archive。
+    truncated: false
+  risks:
+    - text: No independent semantic Verifier execution was available; Runtime checks
+        alone do not cover acceptance semantics.
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-08-25T10:17:15.719Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: execution-error
+    unresolved_ids: []
+    summary:
+      text: 独立只读 Verifier 未开始审查即失败：Command Code API 返回 429 RATE_LIMITED，提示本计划 5
+        小时用量已达上限，额度预计于 2026-08-25T12:48:11.522Z 重置。未产生 A1-A10
+        验收结论、风险或补充检查请求；Builder handoff 和 Runtime checks 不能替代独立语义验收。
+      truncated: false
+    completed_at: 2026-08-25T09:51:27.946Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 2
+    outcome: blocked
+    unresolved_ids:
+      - A1
+      - A2
+      - A3
+      - A4
+      - A5
+      - A6
+      - A7
+      - A8
+      - A9
+      - A10
+    summary:
+      text: 按用户指示将当前环境视为 subagent 不可用。独立只读 Verifier 无法启动；本轮已由 Runtime 执行并记录全部必要命令检查为
+        passed，但没有独立语义 Verifier 对 A1-A10 的逐项结论。不得将命令检查或 Builder handoff 等同于独立验收。
+      truncated: false
+    completed_at: 2026-08-25T09:53:42.058Z
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 2
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 用户已明确接受 verifier-unavailable 降级验收：接受 Runtime 已执行并全部通过的真实
+        PostgreSQL、Go、Race、Vet、M0 回归和 CLI 检查；接受没有 Comet 绑定的独立 Verifier
+        逐项结论这一限制；确认继续进入 Archive。
+      truncated: false
+    completed_at: 2026-08-25T10:17:15.719Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: false
+created_at: 2026-08-25T08:23:53.918Z
