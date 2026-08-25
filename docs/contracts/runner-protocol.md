@@ -1,6 +1,6 @@
 # Runner Protocol Contract
 
-**状态：** `PROPOSED`，目标在 Milestone 1 冻结 v0  
+**状态：** `FUTURE → M3`；`PROPOSED`，目标在 Milestone 1 冻结 v0
 **用途：** 定义 Go Control Plane 与 Trial Worker 之间的语言无关边界
 
 ## 1. 设计原则

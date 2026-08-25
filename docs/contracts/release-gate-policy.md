@@ -1,6 +1,6 @@
 # Release Gate Policy Contract
 
-**状态：** `PROPOSED`，用于 v0 Promotion Decision
+**状态：** `FUTURE → M6`；`PROPOSED`，用于 v0 Promotion Decision
 
 ## 1. 决策目标
 

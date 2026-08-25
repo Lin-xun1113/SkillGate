@@ -1,6 +1,6 @@
 # Event Schema Contract
 
-**状态：** `PROPOSED`，用于 v0 Trace/Event 设计
+**状态：** `FUTURE → M3`；`PROPOSED`，用于 v0 Trace/Event 设计
 
 ## 1. Event Envelope
 

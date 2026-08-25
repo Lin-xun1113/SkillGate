@@ -19,13 +19,13 @@ SkillGate 是一个面向作品集的系统项目，用于评估可复用的 AI 
 
 ## 当前状态
 
-**阶段：M0 已完成并归档；下一步进入 M1 Shape。应用实现尚未开始。**
+**阶段：M0 已完成并归档；M1 Registry/Manifest Compiler 已确认 Shape（验收项 A1–A9）并进入 Build，尚未归档。**
 
 首个 CSV/Data Analysis 离线评估样例已通过 Native 独立验收并归档（A1–A89 全部通过）：包含 8 个 Case、配对 Baseline/Candidate、Forced Injection/Autonomous Trigger/Security Probe 分离、确定性 Schema/Trace 断言、Fixture Harness、Security Evidence、Pair/Trial Identity 示例和内容 Hash。`npm run validate:m0` 可在无 Provider Credential 的情况下复核这些输入。归档产物位于 `docs/comet/archive/2026-08-19-m0-evaluation-baseline/`。
 
 M0 只验证离线实验编排和契约证据；真实 Model、Python Worker、Docker Sandbox、网络 Runtime、PostgreSQL、gRPC 和 UI 仍未实现，按计划留给后续里程碑。下一步是 M1 Registry 与 Experiment Compiler Shape。
 
-项目计划、研究报告、Contracts、架构、运维规则和作品集叙事都在 [`docs/`](docs/README.md) 中。当前样例入口见 [`evals/csv-analysis/`](evals/csv-analysis/)、[`experiments/csv-analysis-v1-demo.yaml`](experiments/csv-analysis-v1-demo.yaml) 和 [`docs/decisions/ADR-007-m0-csv-analysis-workload.md`](docs/decisions/ADR-007-m0-csv-analysis-workload.md)。
+M1 当前提供本地 Go CLI：`skill validate/register`、`suite validate/register` 和 `compile`；默认使用 `.skillgate/registry` 文件系统 CAS，仅用于离线开发，不替代后续 PostgreSQL 事实来源。M1 仍不执行 Trial。Environment Identity 绑定 URI 与 Descriptor Hash；Skill Package 保持 SKILL.md 原始文本，仅规范换行；Suite 引用使用 Declared Hash 语义。项目计划、研究报告、Contracts、架构、运维规则和作品集叙事都在 [`docs/`](docs/README.md) 中。当前样例入口见 [`evals/csv-analysis/`](evals/csv-analysis/)、[`experiments/csv-analysis-v1-demo.yaml`](experiments/csv-analysis-v1-demo.yaml) 和 [`docs/decisions/ADR-007-m0-csv-analysis-workload.md`](docs/decisions/ADR-007-m0-csv-analysis-workload.md)。
 
 ## 目标架构
 

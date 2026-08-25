@@ -1,6 +1,6 @@
 # API Contract
 
-**状态：** `PROPOSED`，MVP 初期使用 REST/JSON；内部 Worker 使用 gRPC
+**状态：** `FUTURE → M2`；`PROPOSED`，MVP 初期使用 REST/JSON
 
 ## 1. API 原则
 

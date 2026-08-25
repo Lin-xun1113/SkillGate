@@ -1,6 +1,6 @@
 # 执行生命周期
 
-**状态：** `ACCEPTED`，用于 MVP
+**状态：** `FUTURE → M2`；`ACCEPTED`，用于 MVP
 
 ## 1. Experiment 生命周期
 

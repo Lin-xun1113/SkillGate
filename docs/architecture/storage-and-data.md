@@ -1,6 +1,6 @@
 # 存储与数据架构
 
-**状态：** `ACCEPTED`，用于 MVP
+**状态：** `FUTURE → M2`；`ACCEPTED`，用于 MVP
 
 ## 1. 存储分工
 
