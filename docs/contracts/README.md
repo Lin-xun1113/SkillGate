@@ -5,7 +5,8 @@
 - `runner-protocol.md` —— **`FUTURE → M3`** Go Control Plane 与 Worker 的 gRPC 语义边界
 - `event-schema.md` —— **`FUTURE → M3`** Event Envelope、Event Type、Sequence 和脱敏
 - `release-gate-policy.md` —— **`FUTURE → M6`** PROMOTE/HOLD/REJECT 和 Security Hard Gate
-- `api-contract.md` —— **`FUTURE → M2`** REST/JSON 资源、Endpoint、错误和并发控制
+- `scheduler-reliability-contract.md` —— **`PROVISIONAL → M2`** PostgreSQL Queue/Lease/Retry/幂等 Commit 与 CLI Contract
+- `api-contract.md` —— **`FUTURE → M2+`** REST/JSON 资源、Endpoint、错误和并发控制
 
 这些文档是实现时的规范性依据。代码行为改变 Contract 前，必须先更新 ADR 和对应文档。
 

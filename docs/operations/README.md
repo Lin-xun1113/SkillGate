@@ -1,7 +1,7 @@
 # 运维文档索引
 
-- `local-development.md` —— **`FUTURE → M2`** 本地依赖、启动顺序和常见问题
-- `failure-recovery.md` —— **`FUTURE → M2`** Worker、DB、Object Store、Provider 和数据不一致恢复
+- `local-development.md` —— **`PROVISIONAL → M2`** PostgreSQL、Migration、CLI 和测试启动顺序
+- `failure-recovery.md` —— **`PROVISIONAL → M2`** Worker、DB、Lease、Result 和数据不一致恢复
 - `security-operations.md` —— **`FUTURE → M3`** Skill Admission、Sandbox、Credential 和 Incident Response
 - `observability.md` —— **`FUTURE → M4`** Dashboard、Metric、Log 和排查路径
 

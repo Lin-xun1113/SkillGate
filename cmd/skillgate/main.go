@@ -28,6 +28,14 @@ func main() {
 		code = suiteCommand(os.Args[2:])
 	case "compile":
 		code = compileCommand(os.Args[2:])
+	case "db":
+		code = databaseCommand(os.Args[2:])
+	case "experiment":
+		code = experimentCommand(os.Args[2:])
+	case "trial":
+		code = trialCommand(os.Args[2:])
+	case "scheduler":
+		code = schedulerCommand(os.Args[2:])
 	case "--help", "-h":
 		usage()
 	default:
@@ -42,6 +50,10 @@ func usage() {
 	fmt.Println("skillgate skill validate|register <path> [--json]")
 	fmt.Println("skillgate suite validate|register <path> [--registry-root <path>] [--json]")
 	fmt.Println("skillgate compile <manifest> [--registry-root <path>] [--json]")
+	fmt.Println("skillgate db migrate|status [--database-url <url>] [--json]")
+	fmt.Println("skillgate experiment materialize <manifest>|cancel [options] [--json]")
+	fmt.Println("skillgate trial claim|start|heartbeat|complete [options] [--json]")
+	fmt.Println("skillgate scheduler sweep [--limit <n>] [--json]")
 }
 
 func skillCommand(args []string) int {
@@ -200,8 +212,10 @@ func codeFor(code string) int {
 		return 6
 	case "REGISTRY_CONFLICT":
 		return 7
-	case "IO_ERROR":
+	case "IO_ERROR", "DATABASE_UNAVAILABLE", "MIGRATION_FAILED":
 		return 8
+	case "IDENTITY_CONFLICT", "OWNER_MISMATCH", "LEASE_MISMATCH", "LEASE_EXPIRED", "STATUS_CONFLICT", "RESULT_CONFLICT", "LOGICAL_TRIAL_TERMINAL", "EXPERIMENT_CANCEL_REQUESTED", "RETRY_EXHAUSTED", "NOT_CLAIMABLE", "TRIAL_NOT_FOUND":
+		return 9
 	default:
 		return 1
 	}

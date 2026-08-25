@@ -2,7 +2,7 @@
 
 - `system-architecture.md` —— 组件、边界、部署模式和请求流程
 - `domain-model.md` —— 核心实体、Identity Tuple 和数据保留
-- `execution-lifecycle.md` —— **`FUTURE → M2`** Experiment/Trial 状态、Lease、Retry、Commit 和 Replay
+- `execution-lifecycle.md` —— **`PROVISIONAL → M2`** Experiment/Trial 状态、Lease、Retry、Commit 和 Replay
 - `strategy-engine.md` —— **`FUTURE → M6`** CEL Rule、Runtime Routing 和 Release Policy
 - `storage-and-data.md` —— **`FUTURE → M2`** PostgreSQL、MinIO、Hash 和数据生命周期
 - `threat-model.md` —— **`FUTURE → M3`** 信任区域、威胁、Sandbox 和安全限制

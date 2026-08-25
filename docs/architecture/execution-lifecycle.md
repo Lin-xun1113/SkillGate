@@ -1,6 +1,6 @@
 # 执行生命周期
 
-**状态：** `FUTURE → M2`；`ACCEPTED`，用于 MVP
+**状态：** `PROVISIONAL → M2`；2026-08-25（UTC）Build 候选，等待 Native Verify
 
 ## 1. Experiment 生命周期
 
@@ -29,21 +29,22 @@ DRAFT
 - 任意活动状态都可以通过 API 变成 `CANCELLED`；Worker 会收到 Cancellation Signal。
 - 缺失必需 Evidence 时进入 `INCOMPLETE`，不能静默当作 0。
 
-## 2. Trial 生命周期
+## 2. Logical Trial 与 Attempt 生命周期
 
 ```text
-PENDING
-  └─ lease ─> LEASED
-                 └─ start ─> RUNNING
-                                ├─ output ─> GRADING
-                                ├─ timeout ─> TIMED_OUT
-                                ├─ cancel ─> CANCELLED
-                                └─ error ─> RETRY_WAIT 或 FAILED
-GRADING ── complete ─> SUCCEEDED
-GRADING ── invalid evidence ─> INCOMPLETE
+Logical Trial:
+PENDING → LEASED → RUNNING
+                     ├→ RETRY_WAIT → PENDING
+                     ├→ SUCCEEDED
+                     ├→ FAILED
+                     ├→ TIMED_OUT
+                     └→ CANCELLED
+
+Attempt:
+PENDING → LEASED → RUNNING → SUCCEEDED|FAILED|TIMED_OUT|CANCELLED
 ```
 
-Trial 只能从 `RETRY_WAIT`、`TIMED_OUT` 或可重试的 `FAILED` 状态重新执行。成功提交后进入终态，并且提交必须幂等。
+M2 使用 `logical_trial_id=sha256({pair_id,arm})` 表示 Retry 组，保留 M1 `trial_id=sha256({pair_id,arm,attempt})` 作为 Attempt ID。Retry 创建新的 Attempt，不改变 Pair/Logical Trial Identity；一个 Logical Trial 最多一条最终 Result，并只更新一次 Experiment Counter。M2 不声称 Exactly-once Execution。
 
 ## 3. Lease 算法
 
@@ -72,7 +73,7 @@ RETURNING t.*;
 COMMIT;
 ```
 
-`FOR UPDATE` 防止被选中的 Row 被并发更新；`SKIP LOCKED` 允许并发 Worker 领取不同的任务，而不必等待已经被锁住的任务。具体查询和 Index 必须在目标 PostgreSQL 版本和代表性数据量下进行 Benchmark。
+`FOR UPDATE` 防止被选中的 Attempt Row 被并发更新；`SKIP LOCKED` 允许并发 Worker 领取不同的 Attempt，而不必等待已经被锁住的任务。Lease Token 以 Hash 保存，Lease Generation 作为 Fence 单调递增；具体查询和 Index 必须在目标 PostgreSQL 版本和代表性数据量下进行 Benchmark。
 
 ## 4. Heartbeat 与过期处理
 
@@ -87,7 +88,7 @@ Worker Heartbeat 至少包含：
 
 Server 只有在 Lease Token 匹配时才接受 Heartbeat。Expiry Sweeper 将过期的 `LEASED`/`RUNNING` Trial 按 Retry Policy 移到 `RETRY_WAIT` 或 `FAILED`。
 
-Lease 过期后的 Worker Completion 不能自动接受。Committer 先检查 Trial 是否已进入终态；如果已经完成，则返回已保存的 Result。否则只有在明确的 Lease Recovery 规则允许时才能接受，并且必须记录竞态情况。
+Lease 过期后的 Worker Completion 一律返回 `LEASE_EXPIRED`，即使尚未被新 Worker 重新领取。只有 Lease 有效期间已经提交但响应丢失的同一 Completion 才返回已保存 Result。
 
 ## 5. Result Commit Protocol
 
@@ -106,12 +107,13 @@ Lease 过期后的 Worker Completion 不能自动接受。Committer 先检查 Tr
 
 Cancellation 采用协作式流程：
 
-1. API 将 Experiment/Trial 标记为要求取消。
+1. CLI/后续 API 将 Experiment 标记为 `CANCEL_REQUESTED`。
 2. Scheduler 停止领取新任务。
 3. Worker 通过 Heartbeat 响应或 Control Stream 收到取消通知。
 4. Worker 取消 LangGraph/Agent Context 和 Sandbox Process。
 5. Worker 上传状态为 `cancelled` 的部分 Evidence。
-6. Server 校验 Owner 后将 Trial 设为终态。
+6. Server 校验 Owner 后将 Attempt/Logical Trial 设为 `CANCELLED`；Lease 到期的运行任务由 Sweeper 以 `CANCELLED` 收敛。
+7. 所有 Logical Trial 终态后，Experiment 进入 `CANCELLED`。
 
 强制 Timeout 可以杀死 Sandbox，但仍必须生成类型化的 Timeout Result。
 

@@ -1,8 +1,8 @@
 # SkillGate 项目状态
 
 **最后更新：** 2026-08-25（UTC）  
-**阶段：** M0 已完成并归档；M1 已重新确认 Shape（验收项收敛为 A1–A9），当前进入 Build 阶段，尚未归档
-**实现状态：** Go Module、Canonical Identity、文件系统 CAS、Manifest Compiler、CLI 和 Contract Tests 已建立；M1 Shape 已确认、验收项收敛为 9 项（仅来自 brief.md），当前处于 Build 阶段等待 Builder 候选提交。
+**阶段：** M0、M1 已完成并归档；M2 已确认 Shape 并进入 Build 阶段，尚未通过独立 Verify。
+**实现状态：** Go Module、Canonical Identity、文件系统 CAS、Manifest Compiler、CLI 和 Contract Tests 已建立；M2 Build 候选已新增 PostgreSQL Migration、Queue/Lease、Retry、幂等 Result Commit、取消和真实 PostgreSQL 故障测试。M2 的验收结论仍由 Native 独立 Verifier 决定。
 
 ### M1 暂停原因与修复
 
@@ -46,6 +46,7 @@ M1 在 Native Verify 阶段经历了 5 轮 Build/Verify 循环，产生了 83 �
 | ADR-005 | Sandbox 和 Security 是独立的硬门禁 | 已接受 |
 | ADR-006 | Forced Injection 与 Autonomous Trigger 是不同的评估总体 | 已接受 |
 | ADR-007 | M0 首个 Workload 采用 CSV/Data Analysis 离线纵向切片 | 已接受 |
+| ADR-009 | M2 PostgreSQL Queue/Lease、严格 Fence、Retry 和幂等 Commit | M2 Shape 已接受，Verify 待完成 |
 
 具体理由见 [`docs/decisions/`](docs/decisions/)。
 
@@ -66,6 +67,21 @@ M1 在 Native Verify 阶段经历了 5 轮 Build/Verify 循环，产生了 83 �
 
 最近一次检查：`npm run validate:m0`、`npm run validate:m0:hashes`、`node --check scripts/validate-m0.mjs` 和 `node --check scripts/run-m0-fixture.mjs` 通过。M0 没有执行真实 Model、Docker Sandbox 或网络 Runtime Probe；这些限制已记录为后续里程碑范围。
 
+## M2 当前 Build 候选
+
+已新增（候选实现，等待独立 Verify）：
+
+- `internal/lease`：高熵 Lease Token、Hash 和常量时间校验；
+- `internal/retry`：Retry Classification、有界 Exponential Backoff + Full Jitter；
+- `internal/scheduler`：Logical Trial/Attempt Identity、状态和稳定错误 Contract；
+- `internal/store`、`internal/store/postgres`：嵌入式 Goose SQL Migration、pgx Pool、物化、`FOR UPDATE SKIP LOCKED` Claim、Start/Heartbeat、Expiry Sweeper、Retry、Result Commit、Counter 和取消；
+- M2 CLI：`db migrate|status`、`experiment materialize|cancel`、`trial claim|start|heartbeat|complete`、`scheduler sweep`；
+- 真实 PostgreSQL 测试：Migration 幂等、40 Worker 并发 Claim、Heartbeat 负向、Completion 三次、响应丢失重发、Expiry Retry/迟到提交和两阶段取消。
+
+M2 冻结 `logical_trial_id=hash(pair_id,arm)`，保留 M1 `trial_id=hash(pair_id,arm,attempt)`，不声称 Exactly-once Execution。M2 不实现 REST、Worker gRPC、真实 Model、Sandbox、Artifact Store、Grading、Metrics 或 Release Gate。
+
+当前本地验证（2026-08-25 UTC）：`go test ./...`、`go test -race ./internal/store/postgres`、`go vet ./...`、真实 PostgreSQL 17.11 集成测试和 M2 CLI Migration/Materialize Smoke 已通过。完整 Gate 和文档一致性仍待独立 Verify。
+
 ## M1 当前实现与下一步
 
 已建立：
@@ -75,9 +91,7 @@ M1 在 Native Verify 阶段经历了 5 轮 Build/Verify 循环，产生了 83 �
 - M0 示例编译目标：24 Pair、48 Trial；
 - M1 第二轮修复重点：完整引用 Root 边界、声明 Hash 投影、Suite 版本 API/原子写入、CLI 退出码与 Contract Tests。
 
-M1 第五轮独立 Verify 后，用户要求重新核对设计并完整收敛。已确认三项设计：Environment Identity=URI+Descriptor Hash；Skill Package=原始文本+LF；Suite 引用=Declared Hash。第六轮工作区 checkpoint 已完成，最近一次父会话 Gate 全部通过：Go tests/vet/help、M0 compile（24 Pair/48 Trial）和 M0 validation。
-
-2026-08-25（UTC）Native 重新确认 Shape：验收项收敛为 A1–A9（全部来自 brief.md，不再含 spec 普通文字），已使用 `--confirmed` 进入 Build。所有开发期检查通过：`go test ./...`、`go vet ./...`、`go run ./cmd/skillgate --help`、M0 compile（24 Pair/48 Trial）、`npm run validate:m0`。当前等待 Builder 候选提交并经独立 Verifier 验收。M1 尚未归档。M1 完成后下一入口为 M2：PostgreSQL Queue/Lease、至少一次执行、Retry 和幂等 Result Commit。M1 不实现 Worker、Scheduler Runtime、真实 Model、Sandbox、gRPC 或 UI。
+M1 第五轮独立 Verify 后，用户要求重新核对设计并完整收敛。已确认三项设计：Environment Identity=URI+Descriptor Hash；Skill Package=原始文本+LF；Suite 引用=Declared Hash。M1 已归档，M2 只消费其冻结的 Pair/Trial Plan，不改变 M1 Golden Identity。M1 不实现 Worker、Scheduler Runtime、真实 Model、Sandbox、gRPC 或 UI。
 
 ## 下班 Checkpoint（2026-08-19 UTC）
 
@@ -89,22 +103,20 @@ M1 第五轮独立 Verify 后，用户要求重新核对设计并完整收敛。
 - 工作区未提交；没有遗留 `.m1-*` Mutation 文件；M0 归档内容未修改。
 - 明日入口：确认已记录的三项 Shape 设计，不重新调查已确认事实；随后按 Runtime continuation 进入 Build/Verify。
 
-## 开始编码前仍需决定的事项
+## 后续仍需决定的事项
 
-1. 首批 Model Provider，以及初始演示使用真实 API 还是 CI 中的录制 Fixture（M0 已选择 Fixture-only 路径）。
-2. PostgreSQL Migration 工具（`goose`、`atlas` 或其他方案）。
-3. gRPC/Protobuf 生成流程。
-4. License 和本地开发中的 Secret 管理方式。
-5. 第一个 MVP 是否必须包含 UI，还是先完成 CLI/Report。
+1. M3 Worker Protocol 的 gRPC/Protobuf 生成流程。
+2. License 和本地开发中的 Secret 管理方式。
+3. 第一个 MVP 是否必须包含 UI，还是先完成 CLI/Report。
 
-这些决定不会改变已确认的产品方向；M1 Shape 时再逐项冻结。
+M2 已在 Shape 冻结 PostgreSQL Queue/Lease、Logical Trial/Attempt Identity、严格过期 Fence、两阶段取消、CLI + Fixture，以及 goose/pgx 版本选择；其余决定不会改变 M2 候选的当前边界。
 
 ## 下一次会话清单
 
-1. ✅ 在 Native Shape 点确认已记录的三项 M1 设计（URI+Descriptor、Raw text+LF、Declared hashes）——已完成（2026-08-25）。
-2. ✅ Builder 候选提交（验收项 A1–A9），Runtime 5 项检查全部通过，独立 Verifier 判定全部 passed。
-3. ✅ Verify 通过，M1 change 已归档并合并到 master（2026-08-25）。
-4. ▶️ 下一步：创建并确认 M2 Native Shape，冻结 PostgreSQL Queue/Lease、Retry 和幂等 Result Commit Contract。
+1. ✅ M1 已归档并合并到 master（2026-08-25）。
+2. ✅ M2 Shape 已确认，用户冻结 Logical Trial/Attempt、严格过期 Fence、两阶段取消和 CLI + Fixture（2026-08-25）。
+3. ▶️ 提交 M2 Builder handoff，运行 Native 独立 Verify；若未通过，按最新 continuation 回到 Build 修复。
+4. ⏳ Verify 通过后才可将 M2 变更标为完成并归档；在此之前不得声称 M2 已实现。
 5. Python Worker 仍按实施计划在 M3/M4 引入。
 
 ## 明确延期的事项
