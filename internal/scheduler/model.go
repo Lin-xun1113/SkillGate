@@ -21,6 +21,7 @@ const (
 	ExperimentRunning         ExperimentStatus = "RUNNING"
 	ExperimentCancelRequested ExperimentStatus = "CANCEL_REQUESTED"
 	ExperimentGrading         ExperimentStatus = "GRADING"
+	ExperimentCompleted       ExperimentStatus = "COMPLETED"
 	ExperimentCancelled       ExperimentStatus = "CANCELLED"
 	ExperimentFailed          ExperimentStatus = "FAILED"
 )

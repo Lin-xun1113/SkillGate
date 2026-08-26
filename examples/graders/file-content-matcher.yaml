@@ -1,0 +1,13 @@
+apiVersion: skillgate.dev/v1alpha1
+kind: Grader
+metadata:
+  name: file-content-matcher
+spec:
+  type: deterministic
+  method: file_content
+  config:
+    expected_file: ./evals/expected/output.txt
+    actual_file_pattern: "output.txt"
+  scoring:
+    passed_score: 1.0
+    failed_score: 0.0
