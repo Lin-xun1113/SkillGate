@@ -125,6 +125,7 @@ type Claim struct {
 	LeaseGeneration int64     `json:"lease_generation"`
 	LeaseExpiresAt  time.Time `json:"lease_expires_at"`
 	Deadline        time.Time `json:"deadline"`
+	ManifestHash    string    `json:"manifest_hash,omitempty"` // M4: for execution projection
 }
 
 type Heartbeat struct {

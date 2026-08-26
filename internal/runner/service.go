@@ -29,14 +29,21 @@ type ServiceOptions struct {
 	SupportedProtocols []string
 	HeartbeatInterval  time.Duration
 	MaxLeaseDuration   time.Duration
+	Projector          ExecutionProjector // M4: optional execution content projector
+}
+
+// ExecutionProjector resolves manifest_hash to execution content.
+type ExecutionProjector interface {
+	Project(ctx context.Context, manifestHash, pairID, arm string) (*ExecutionSpec, string, error)
 }
 
 type RunnerService struct {
 	runnerv1.UnimplementedRunnerControlServer
-	store    store.QueueStore
-	sessions *SessionManager
-	events   *EventManager
-	opts     ServiceOptions
+	store     store.QueueStore
+	sessions  *SessionManager
+	events    *EventManager
+	opts      ServiceOptions
+	projector ExecutionProjector // M4: nil for M3-only deployments
 }
 
 func NewRunnerService(qStore store.QueueStore, opts *ServiceOptions) *RunnerService {
@@ -55,12 +62,14 @@ func NewRunnerService(qStore store.QueueStore, opts *ServiceOptions) *RunnerServ
 		if opts.MaxLeaseDuration > 0 {
 			opt.MaxLeaseDuration = opts.MaxLeaseDuration
 		}
+		opt.Projector = opts.Projector
 	}
 	return &RunnerService{
-		store:    qStore,
-		sessions: NewSessionManager(),
-		events:   NewEventManager(),
-		opts:     opt,
+		store:     qStore,
+		sessions:  NewSessionManager(),
+		events:    NewEventManager(),
+		opts:      opt,
+		projector: opt.Projector,
 	}
 }
 
@@ -148,6 +157,32 @@ func (s *RunnerService) ClaimTrial(ctx context.Context, req *runnerv1.ClaimTrial
 	reqJSON, reqHash, err := BuildTrialRequestPayload(claim)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to build trial request: %v", err)
+	}
+
+	// M4: Project execution content if projector is configured
+	if s.projector != nil && claim.ManifestHash != "" {
+		execSpec, execHash, err := s.projector.Project(ctx, claim.ManifestHash, claim.PairID, claim.Arm)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to project execution: %v", err)
+		}
+
+		// Use new ProjectExecution that returns all components
+		reqJSON, reqHash, _, err = ProjectExecution(
+			reqJSON,
+			reqHash,
+			claim.ManifestHash,
+			execSpec.CaseID,
+			claim.Arm, // arm parameter
+			execSpec.CaseInput,
+			execSpec.SkillHash,
+			execSpec.Model,
+			execSpec.ToolPolicy,
+			execSpec.Environment,
+		)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to inject execution: %v", err)
+		}
+		_ = execHash // execHash from projector is redundant; ProjectExecution recomputes it
 	}
 
 	return &runnerv1.ClaimTrialResponse{
