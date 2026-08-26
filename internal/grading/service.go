@@ -2,9 +2,12 @@ package grading
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -58,12 +61,17 @@ type TrialResult struct {
 	LatencyMS       int
 }
 
-// ExperimentReport represents a report record
+// ExperimentReport represents a report record. ReportType must be one of
+// "json", "markdown", "html" per the experiment_reports.report_type CHECK
+// constraint (migrations/00003_grading_support.sql); FileHash must be a
+// non-empty content hash of FilePath's contents per the file_hash NOT NULL
+// constraint on the same table.
 type ExperimentReport struct {
 	ReportID                 string
 	ExperimentID             string
 	ReportType               string
 	FilePath                 string
+	FileHash                 string
 	ValidPairs               int
 	InvalidPairs             int
 	MeanLift                 *float64
@@ -149,16 +157,20 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 			var gradesManifest grader.GradesManifest
 			if err := json.Unmarshal(trial.Grades, &gradesManifest); err == nil {
 				trialResults = append(trialResults, metrics.TrialResult{
-					TrialID:          trial.TrialID,
-					LogicalTrialID:   trial.LogicalTrialID,
-					ExperimentID:     experimentID,
-					CaseID:           trial.CaseID,
-					Arm:              trial.Arm,
-					RepetitionIndex:  trial.RepetitionIndex,
-					ModelHash:        trial.ModelHash,
-					EnvironmentHash:  trial.EnvironmentHash,
-					GraderHash:       trial.GraderHash,
-					AggregatedScore:  gradesManifest.AggregatedScore,
+					TrialID:         trial.TrialID,
+					LogicalTrialID:  trial.LogicalTrialID,
+					ExperimentID:    experimentID,
+					CaseID:          trial.CaseID,
+					Arm:             trial.Arm,
+					RepetitionIndex: trial.RepetitionIndex,
+					ModelHash:       trial.ModelHash,
+					EnvironmentHash: trial.EnvironmentHash,
+					GraderHash:      trial.GraderHash,
+					AggregatedScore: gradesManifest.AggregatedScore,
+					Passed:          allGradersPassed(gradesManifest),
+					InputTokens:     trial.InputTokens,
+					OutputTokens:    trial.OutputTokens,
+					LatencyMS:       trial.LatencyMS,
 				})
 			}
 			continue
@@ -189,16 +201,20 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		}
 
 		trialResults = append(trialResults, metrics.TrialResult{
-			TrialID:          trial.TrialID,
-			LogicalTrialID:   trial.LogicalTrialID,
-			ExperimentID:     experimentID,
-			CaseID:           trial.CaseID,
-			Arm:              trial.Arm,
-			RepetitionIndex:  trial.RepetitionIndex,
-			ModelHash:        trial.ModelHash,
-			EnvironmentHash:  trial.EnvironmentHash,
-			GraderHash:       trial.GraderHash,
-			AggregatedScore:  result.Score,
+			TrialID:         trial.TrialID,
+			LogicalTrialID:  trial.LogicalTrialID,
+			ExperimentID:    experimentID,
+			CaseID:          trial.CaseID,
+			Arm:             trial.Arm,
+			RepetitionIndex: trial.RepetitionIndex,
+			ModelHash:       trial.ModelHash,
+			EnvironmentHash: trial.EnvironmentHash,
+			GraderHash:      trial.GraderHash,
+			AggregatedScore: result.Score,
+			Passed:          result.Passed,
+			InputTokens:     trial.InputTokens,
+			OutputTokens:    trial.OutputTokens,
+			LatencyMS:       trial.LatencyMS,
 		})
 	}
 
@@ -211,14 +227,14 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	// 6. Pair baseline and candidate
 	var baselineScores, candidateScores []metrics.CaseScore
 	for _, cs := range caseScores {
-		if cs.Arm == "baseline" {
+		if cs.Arm == "without_skill" {
 			baselineScores = append(baselineScores, cs)
-		} else if cs.Arm == "candidate" {
+		} else if cs.Arm == "with_skill" {
 			candidateScores = append(candidateScores, cs)
 		}
 	}
 
-	pairs, err := metrics.PairCases(baselineScores, candidateScores, "baseline", "candidate")
+	pairs, err := metrics.PairCases(baselineScores, candidateScores, "without_skill", "with_skill")
 	if err != nil {
 		return fmt.Errorf("failed to pair cases: %w", err)
 	}
@@ -228,6 +244,9 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	if err != nil {
 		log.Printf("Bootstrap CI failed: %v", err)
 	}
+
+	passAtK := computePassAtK(candidateScores)
+	resourceUsage := computeResourceUsage(trials)
 
 	// 8. Generate report
 	reportDir := filepath.Join(s.artifactsRoot, experimentID)
@@ -241,6 +260,8 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		bootstrapResult,
 		statistics.DefaultBootstrapConfig(),
 		len(trialResults),
+		passAtK,
+		resourceUsage,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to generate report: %w", err)
@@ -249,23 +270,25 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	// Save reports
 	jsonPath, err := generator.SaveJSON(reportData)
 	if err != nil {
-		log.Printf("Failed to save JSON report: %v", err)
-	} else {
-		log.Printf("JSON report saved to %s", jsonPath)
+		return fmt.Errorf("failed to save JSON report: %w", err)
 	}
+	log.Printf("JSON report saved to %s", jsonPath)
 
 	mdPath, err := generator.SaveMarkdown(reportData)
 	if err != nil {
-		log.Printf("Failed to save Markdown report: %v", err)
-	} else {
-		log.Printf("Markdown report saved to %s", mdPath)
+		return fmt.Errorf("failed to save Markdown report: %w", err)
 	}
+	log.Printf("Markdown report saved to %s", mdPath)
 
 	htmlPath, err := generator.SaveHTML(reportData)
 	if err != nil {
-		log.Printf("Failed to save HTML report: %v", err)
-	} else {
-		log.Printf("HTML report saved to %s", htmlPath)
+		return fmt.Errorf("failed to save HTML report: %w", err)
+	}
+	log.Printf("HTML report saved to %s", htmlPath)
+
+	jsonHash, err := hashFile(jsonPath)
+	if err != nil {
+		return fmt.Errorf("failed to hash JSON report: %w", err)
 	}
 
 	// 9. Save report metadata to database
@@ -292,8 +315,9 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	reportRecord := &ExperimentReport{
 		ReportID:                 fmt.Sprintf("report-%s-%d", experimentID, time.Now().Unix()),
 		ExperimentID:             experimentID,
-		ReportType:               "full",
-		FilePath:                 filepath.Join(reportDir, "report.json"),
+		ReportType:               "json",
+		FilePath:                 jsonPath,
+		FileHash:                 jsonHash,
 		ValidPairs:               validPairs,
 		InvalidPairs:             invalidPairs,
 		MeanLift:                 meanLift,
@@ -304,7 +328,7 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	}
 
 	if err := s.store.SaveReport(ctx, reportRecord); err != nil {
-		log.Printf("Failed to save report metadata: %v", err)
+		return fmt.Errorf("failed to save report metadata: %w", err)
 	}
 
 	// 10. Transition experiment to COMPLETED
@@ -314,4 +338,93 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 
 	log.Printf("Experiment %s grading completed", experimentID)
 	return nil
+}
+
+// hashFile returns the sha256 hex digest of a file's contents, for populating
+// experiment_reports.file_hash (NOT NULL per migrations/00003_grading_support.sql).
+func hashFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+// allGradersPassed reports whether every grader in the manifest passed
+// (or, if there are none, false — an empty grades manifest is not a pass).
+func allGradersPassed(manifest grader.GradesManifest) bool {
+	if len(manifest.Graders) == 0 {
+		return false
+	}
+	for _, g := range manifest.Graders {
+		if !g.Passed {
+			return false
+		}
+	}
+	return true
+}
+
+// computePassAtK pools per-trial pass/fail outcomes across the candidate arm's
+// case scores and reports pass@1, pass^1, and (when enough repetitions exist)
+// pass@3/pass^3, per D5's HumanEval-style formula. Returns nil when there is no
+// candidate data at all, so the report omits the pass_at_k section entirely
+// rather than showing a misleading zero.
+func computePassAtK(candidateScores []metrics.CaseScore) map[string]float64 {
+	var attempts []bool
+	for _, cs := range candidateScores {
+		attempts = append(attempts, cs.TrialPassed...)
+	}
+	if len(attempts) == 0 {
+		return nil
+	}
+
+	result := make(map[string]float64)
+	for _, k := range []int{1, 3} {
+		if k > len(attempts) {
+			continue
+		}
+		r, err := statistics.PassAtK(attempts, k)
+		if err != nil {
+			log.Printf("pass@%d calculation failed: %v", k, err)
+			continue
+		}
+		result[fmt.Sprintf("pass@%d", k)] = r.PassAtK
+		result[fmt.Sprintf("pass^%d", k)] = r.PassPowerK
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+// computeResourceUsage compares token and latency usage between the
+// without_skill (baseline) and with_skill (candidate) arms. Returns nil when
+// neither arm recorded any usage, so the report omits the resource_usage
+// section instead of showing a zero delta that implies "no difference".
+func computeResourceUsage(trials []TrialResult) *report.ResourceUsage {
+	var baselineTokens, candidateTokens []float64
+	var baselineLatency, candidateLatency []float64
+
+	for _, trial := range trials {
+		tokens := float64(trial.InputTokens + trial.OutputTokens)
+		latency := float64(trial.LatencyMS)
+		switch trial.Arm {
+		case "without_skill":
+			baselineTokens = append(baselineTokens, tokens)
+			baselineLatency = append(baselineLatency, latency)
+		case "with_skill":
+			candidateTokens = append(candidateTokens, tokens)
+			candidateLatency = append(candidateLatency, latency)
+		}
+	}
+
+	if len(baselineTokens) == 0 && len(candidateTokens) == 0 {
+		return nil
+	}
+
+	return &report.ResourceUsage{
+		TokenDelta:   *statistics.CalculateResourceDelta(baselineTokens, candidateTokens),
+		LatencyDelta: *statistics.CalculateResourceDelta(baselineLatency, candidateLatency),
+	}
 }

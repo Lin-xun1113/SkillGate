@@ -87,8 +87,8 @@ func (s *Store) Materialize(ctx context.Context, compiled *manifest.CompiledExpe
 			}
 			if logicalCount == 0 {
 				_, err = tx.Exec(ctx, `
-INSERT INTO experiments (experiment_id, manifest_hash, plan_hash, status, total_logical_trials, budget_deadline_at)
-VALUES ($1,$2,$3,'QUEUED',$4,clock_timestamp()+($5 * interval '1 millisecond'))`, experimentID, compiled.ManifestHash, planHash, compiled.TrialCount, options.BudgetTimeout.Milliseconds())
+INSERT INTO experiments (experiment_id, manifest_hash, plan_hash, status, total_logical_trials, budget_deadline_at, grader_hash)
+VALUES ($1,$2,$3,'QUEUED',$4,clock_timestamp()+($5 * interval '1 millisecond'),$6)`, experimentID, compiled.ManifestHash, planHash, compiled.TrialCount, options.BudgetTimeout.Milliseconds(), pair.Identity.GraderHash)
 				if err != nil {
 					return MaterializeResult{}, wrapDatabaseError("插入 experiment", err)
 				}
@@ -96,10 +96,12 @@ VALUES ($1,$2,$3,'QUEUED',$4,clock_timestamp()+($5 * interval '1 millisecond'))`
 			_, err = tx.Exec(ctx, `
 INSERT INTO logical_trials (
  logical_trial_id, experiment_id, pair_id, arm, status, priority, current_attempt,
- max_attempts, timeout_ms, backoff_base_ms, backoff_cap_ms, retryable_categories
-) VALUES ($1,$2,$3,$4,'PENDING',$5,1,$6,$7,$8,$9,$10)`,
+ max_attempts, timeout_ms, backoff_base_ms, backoff_cap_ms, retryable_categories,
+ case_id, repetition_index, model_hash, environment_hash, grader_hash
+) VALUES ($1,$2,$3,$4,'PENDING',$5,1,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
 				logicalID, experimentID, pair.PairID, trial.Arm, options.Priority,
-				options.MaxAttempts, options.Timeout.Milliseconds(), options.BackoffBase.Milliseconds(), options.BackoffCap.Milliseconds(), categoryStrings)
+				options.MaxAttempts, options.Timeout.Milliseconds(), options.BackoffBase.Milliseconds(), options.BackoffCap.Milliseconds(), categoryStrings,
+				pair.CaseID, pair.Repetition, pair.Identity.ModelHash, pair.Identity.EnvironmentHash, pair.Identity.GraderHash)
 			if err != nil {
 				return MaterializeResult{}, wrapDatabaseError("插入 logical trial", err)
 			}

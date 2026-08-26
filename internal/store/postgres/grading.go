@@ -43,7 +43,7 @@ func (s *Store) GetExperimentsInGrading(ctx context.Context) ([]string, error) {
 // GetExperimentByID retrieves an experiment by ID
 func (s *Store) GetExperimentByID(ctx context.Context, experimentID string) (*grading.Experiment, error) {
 	var exp grading.Experiment
-	var graderHash string
+	var graderHash *string
 
 	err := s.pool.QueryRow(ctx, `
 		SELECT experiment_id, grader_hash
@@ -58,34 +58,36 @@ func (s *Store) GetExperimentByID(ctx context.Context, experimentID string) (*gr
 		return nil, wrapDatabaseError("get experiment", err)
 	}
 
-	exp.GraderHash = graderHash
+	if graderHash != nil {
+		exp.GraderHash = *graderHash
+	}
 	exp.ArtifactsDir = fmt.Sprintf("artifacts/%s", experimentID)
 
 	return &exp, nil
 }
 
-// GetTrialResults retrieves all trial results for an experiment
+// GetTrialResults retrieves all trial results for an experiment.
+// Arm is the canonical "without_skill"/"with_skill" value stored on logical_trials
+// (see internal/experiment/compiler.go); token/latency usage lives in the
+// trial_results.usage jsonb blob (scheduler.ResourceUsage shape), not scalar columns.
 func (s *Store) GetTrialResults(ctx context.Context, experimentID string) ([]grading.TrialResult, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT
 			r.result_id,
 			r.trial_id,
 			r.logical_trial_id,
-			lt.case_id,
-			p.arm,
+			COALESCE(lt.case_id, ''),
+			lt.arm,
 			lt.repetition_index,
-			lt.model_hash,
-			lt.environment_hash,
-			lt.grader_hash,
+			COALESCE(lt.model_hash, ''),
+			COALESCE(lt.environment_hash, ''),
+			COALESCE(lt.grader_hash, ''),
 			COALESCE(r.grades, '{}'),
-			COALESCE(r.input_tokens, 0),
-			COALESCE(r.output_tokens, 0),
-			COALESCE(r.latency_ms, 0)
+			COALESCE(r.usage, '{}')
 		FROM trial_results r
 		JOIN logical_trials lt ON r.logical_trial_id = lt.logical_trial_id
-		JOIN pairs p ON lt.pair_id = p.pair_id
 		WHERE lt.experiment_id = $1
-		ORDER BY lt.case_id, p.arm, lt.repetition_index
+		ORDER BY lt.case_id, lt.arm, lt.repetition_index
 	`, experimentID)
 
 	if err != nil {
@@ -97,6 +99,7 @@ func (s *Store) GetTrialResults(ctx context.Context, experimentID string) ([]gra
 	for rows.Next() {
 		var tr grading.TrialResult
 		var grades []byte
+		var usage []byte
 
 		err := rows.Scan(
 			&tr.ResultID,
@@ -109,9 +112,7 @@ func (s *Store) GetTrialResults(ctx context.Context, experimentID string) ([]gra
 			&tr.EnvironmentHash,
 			&tr.GraderHash,
 			&grades,
-			&tr.InputTokens,
-			&tr.OutputTokens,
-			&tr.LatencyMS,
+			&usage,
 		)
 		if err != nil {
 			return nil, wrapDatabaseError("scan trial result", err)
@@ -119,6 +120,15 @@ func (s *Store) GetTrialResults(ctx context.Context, experimentID string) ([]gra
 
 		tr.Grades = json.RawMessage(grades)
 		tr.ArtifactsDir = fmt.Sprintf("artifacts/%s/%s", experimentID, tr.TrialID)
+
+		var resourceUsage scheduler.ResourceUsage
+		if len(usage) > 0 {
+			if jsonErr := json.Unmarshal(usage, &resourceUsage); jsonErr == nil {
+				tr.InputTokens = int(resourceUsage.InputTokens)
+				tr.OutputTokens = int(resourceUsage.OutputTokens)
+				tr.LatencyMS = int(resourceUsage.ElapsedMS)
+			}
+		}
 
 		results = append(results, tr)
 	}
@@ -173,6 +183,7 @@ func (s *Store) SaveReport(ctx context.Context, report *grading.ExperimentReport
 			experiment_id,
 			report_type,
 			file_path,
+			file_hash,
 			valid_pairs,
 			invalid_pairs,
 			mean_lift,
@@ -180,11 +191,12 @@ func (s *Store) SaveReport(ctx context.Context, report *grading.ExperimentReport
 			ci_upper,
 			statistically_significant,
 			created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (experiment_id) DO UPDATE SET
 			report_id = EXCLUDED.report_id,
 			report_type = EXCLUDED.report_type,
 			file_path = EXCLUDED.file_path,
+			file_hash = EXCLUDED.file_hash,
 			valid_pairs = EXCLUDED.valid_pairs,
 			invalid_pairs = EXCLUDED.invalid_pairs,
 			mean_lift = EXCLUDED.mean_lift,
@@ -192,7 +204,7 @@ func (s *Store) SaveReport(ctx context.Context, report *grading.ExperimentReport
 			ci_upper = EXCLUDED.ci_upper,
 			statistically_significant = EXCLUDED.statistically_significant,
 			created_at = EXCLUDED.created_at
-	`, report.ReportID, report.ExperimentID, report.ReportType, report.FilePath,
+	`, report.ReportID, report.ExperimentID, report.ReportType, report.FilePath, report.FileHash,
 		report.ValidPairs, report.InvalidPairs, report.MeanLift, report.CILower,
 		report.CIUpper, report.StatisticallySignificant, report.CreatedAt)
 

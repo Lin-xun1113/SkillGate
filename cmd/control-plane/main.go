@@ -64,6 +64,9 @@ func main() {
 
 	// Initialize Grader Registry
 	graderRegistry := grader.NewRegistry(*gradersDir)
+	if err := graderRegistry.LoadFromDirectory(*gradersDir); err != nil {
+		log.Printf("Warning: failed to load graders from %s: %v", *gradersDir, err)
+	}
 
 	// Initialize Grading Service
 	gradingService := grading.NewService(store, graderRegistry, *artifactsDir, *gradingPollInterval)

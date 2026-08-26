@@ -7,22 +7,25 @@ import (
 
 // CaseScore represents aggregated scores for a single case-arm combination
 type CaseScore struct {
-	CaseID       string    `json:"case_id"`
-	Arm          string    `json:"arm"`
-	Repetitions  int       `json:"repetitions"`
-	MeanScore    float64   `json:"mean_score"`
-	StdDev       float64   `json:"std_dev"`
-	TrialScores  []float64 `json:"trial_scores"`
+	CaseID      string    `json:"case_id"`
+	Arm         string    `json:"arm"`
+	Repetitions int       `json:"repetitions"`
+	MeanScore   float64   `json:"mean_score"`
+	StdDev      float64   `json:"std_dev"`
+	TrialScores []float64 `json:"trial_scores"`
+	TrialPassed []bool    `json:"trial_passed"`
 }
 
 // Pair represents a matched baseline-candidate pair
 type Pair struct {
-	CaseID          string  `json:"case_id"`
-	BaselineScore   float64 `json:"baseline_score"`
-	CandidateScore  float64 `json:"candidate_score"`
-	Difference      float64 `json:"difference"`
-	Valid           bool    `json:"valid"`
-	InvalidReason   string  `json:"invalid_reason,omitempty"`
+	CaseID               string  `json:"case_id"`
+	BaselineScore        float64 `json:"baseline_score"`
+	CandidateScore       float64 `json:"candidate_score"`
+	Difference           float64 `json:"difference"`
+	BaselineRepetitions  int     `json:"baseline_repetitions"`
+	CandidateRepetitions int     `json:"candidate_repetitions"`
+	Valid                bool    `json:"valid"`
+	InvalidReason        string  `json:"invalid_reason,omitempty"`
 }
 
 // TrialResult represents a single trial's grading result
@@ -34,6 +37,10 @@ type TrialResult struct {
 	Arm             string  `json:"arm"`
 	RepetitionIndex int     `json:"repetition_index"`
 	AggregatedScore float64 `json:"aggregated_score"`
+	Passed          bool    `json:"passed"`
+	InputTokens     int     `json:"input_tokens"`
+	OutputTokens    int     `json:"output_tokens"`
+	LatencyMS       int     `json:"latency_ms"`
 	ModelHash       string  `json:"model_hash"`
 	EnvironmentHash string  `json:"environment_hash"`
 	GraderHash      string  `json:"grader_hash"`
@@ -60,8 +67,10 @@ func AggregateCaseScores(trials []TrialResult) ([]CaseScore, error) {
 
 		// Collect scores
 		var scores []float64
+		var passed []bool
 		for _, trial := range groupTrials {
 			scores = append(scores, trial.AggregatedScore)
+			passed = append(passed, trial.Passed)
 		}
 
 		// Calculate mean and stddev
@@ -75,6 +84,7 @@ func AggregateCaseScores(trials []TrialResult) ([]CaseScore, error) {
 			MeanScore:   mean,
 			StdDev:      stddev,
 			TrialScores: scores,
+			TrialPassed: passed,
 		})
 	}
 
@@ -102,9 +112,10 @@ func PairCases(baseline, candidate []CaseScore, baselineArm, candidateArm string
 		if !ok {
 			// Case ID not found in baseline
 			pairs = append(pairs, Pair{
-				CaseID:        candidateCS.CaseID,
-				Valid:         false,
-				InvalidReason: "case_id_mismatch",
+				CaseID:               candidateCS.CaseID,
+				CandidateRepetitions: candidateCS.Repetitions,
+				Valid:                false,
+				InvalidReason:        "case_id_mismatch",
 			})
 			continue
 		}
@@ -122,12 +133,14 @@ func PairCases(baseline, candidate []CaseScore, baselineArm, candidateArm string
 		diff := candidateCS.MeanScore - baselineCS.MeanScore
 
 		pairs = append(pairs, Pair{
-			CaseID:         candidateCS.CaseID,
-			BaselineScore:  baselineCS.MeanScore,
-			CandidateScore: candidateCS.MeanScore,
-			Difference:     diff,
-			Valid:          valid,
-			InvalidReason:  invalidReason,
+			CaseID:               candidateCS.CaseID,
+			BaselineScore:        baselineCS.MeanScore,
+			CandidateScore:       candidateCS.MeanScore,
+			Difference:           diff,
+			BaselineRepetitions:  baselineCS.Repetitions,
+			CandidateRepetitions: candidateCS.Repetitions,
+			Valid:                valid,
+			InvalidReason:        invalidReason,
 		})
 	}
 

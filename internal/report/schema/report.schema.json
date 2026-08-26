@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SkillGate Experiment Report",
+  "type": "object",
+  "required": ["schema", "experiment_id", "metadata", "summary", "case_results", "invalid_pairs", "statistical_method"],
+  "properties": {
+    "schema": { "type": "string" },
+    "experiment_id": { "type": "string" },
+    "metadata": {
+      "type": "object",
+      "required": ["experiment_name", "created_at", "total_trials", "valid_pairs", "invalid_pairs"],
+      "properties": {
+        "experiment_name": { "type": "string" },
+        "created_at": { "type": "string" },
+        "total_trials": { "type": "integer", "minimum": 0 },
+        "valid_pairs": { "type": "integer", "minimum": 0 },
+        "invalid_pairs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["mean_lift", "ci_lower", "ci_upper", "n_cases", "statistically_significant", "method", "num_resamples"],
+      "properties": {
+        "mean_lift": { "type": "number" },
+        "ci_lower": { "type": "number" },
+        "ci_upper": { "type": "number" },
+        "n_cases": { "type": "integer", "minimum": 0 },
+        "statistically_significant": { "type": "boolean" },
+        "method": { "type": "string" },
+        "num_resamples": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "case_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["case_id", "baseline_score", "candidate_score", "difference"],
+        "properties": {
+          "case_id": { "type": "string" },
+          "baseline_score": { "type": "number" },
+          "candidate_score": { "type": "number" },
+          "difference": { "type": "number" },
+          "baseline_repetitions": { "type": "integer" },
+          "candidate_repetitions": { "type": "integer" }
+        }
+      }
+    },
+    "pass_at_k": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "resource_usage": {
+      "type": "object",
+      "properties": {
+        "token_delta": { "$ref": "#/definitions/resourceDelta" },
+        "latency_delta": { "$ref": "#/definitions/resourceDelta" }
+      }
+    },
+    "invalid_pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["case_id", "reason"],
+        "properties": {
+          "case_id": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "statistical_method": {
+      "type": "object",
+      "required": ["bootstrap_method", "ci_method", "significance_level"],
+      "properties": {
+        "bootstrap_method": { "type": "string" },
+        "ci_method": { "type": "string" },
+        "significance_level": { "type": "number" }
+      }
+    }
+  },
+  "definitions": {
+    "resourceDelta": {
+      "type": "object",
+      "properties": {
+        "baseline_mean": { "type": "number" },
+        "candidate_mean": { "type": "number" },
+        "delta": { "type": "number" },
+        "delta_ratio": { "type": "number" }
+      }
+    }
+  }
+}

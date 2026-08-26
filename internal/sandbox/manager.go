@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -132,8 +131,8 @@ func (c *Container) Logs(ctx context.Context) (io.ReadCloser, error) {
 
 // Stop stops and removes the container.
 func (c *Container) Stop(ctx context.Context) error {
-	timeout := 10 * time.Second
-	if err := c.manager.cli.ContainerStop(ctx, c.ID, container.StopOptions{Timeout: &timeout}); err != nil {
+	timeoutSeconds := 10
+	if err := c.manager.cli.ContainerStop(ctx, c.ID, container.StopOptions{Timeout: &timeoutSeconds}); err != nil {
 		return fmt.Errorf("failed to stop container: %w", err)
 	}
 	if err := c.manager.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true}); err != nil {
