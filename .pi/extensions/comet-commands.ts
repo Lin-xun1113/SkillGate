@@ -2,16 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const commands = [
   "comet",
-  "comet-classic",
   "comet-any",
-  "comet-native",
-  "comet-open",
-  "comet-design",
-  "comet-build",
-  "comet-verify",
-  "comet-archive",
-  "comet-hotfix",
-  "comet-tweak"
+  "comet-native"
 ] as const;
 
 export default function registerCometCommands(pi: ExtensionAPI) {
