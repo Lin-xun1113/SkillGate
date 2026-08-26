@@ -67,6 +67,17 @@
         }
       }
     },
+    "decision": {
+      "type": "object",
+      "required": ["result", "policy_hash", "snapshot_hash", "matched_rules", "evaluated_rules", "failed_conditions", "explanation"],
+      "properties": {
+        "result": { "type": "string", "enum": ["PROMOTE", "HOLD", "REJECT"] },
+        "policy_hash": { "type": "string" },
+        "snapshot_hash": { "type": "string" },
+        "matched_rules": { "type": "array", "items": { "type": "string" } },
+        "explanation": { "type": "string" }
+      }
+    },
     "statistical_method": {
       "type": "object",
       "required": ["bootstrap_method", "ci_method", "significance_level"],

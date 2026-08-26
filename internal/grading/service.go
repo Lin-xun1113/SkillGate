@@ -13,9 +13,11 @@ import (
 
 	"github.com/Lin-xun1113/SkillGate/internal/grader"
 	"github.com/Lin-xun1113/SkillGate/internal/metrics"
+	"github.com/Lin-xun1113/SkillGate/internal/releasegate"
 	"github.com/Lin-xun1113/SkillGate/internal/report"
 	"github.com/Lin-xun1113/SkillGate/internal/scheduler"
 	"github.com/Lin-xun1113/SkillGate/internal/statistics"
+	"github.com/Lin-xun1113/SkillGate/internal/strategy"
 )
 
 // Store defines the database operations needed by the Grading Service
@@ -40,7 +42,9 @@ type Store interface {
 type Experiment struct {
 	ExperimentID string
 	GraderHash   string
+	PolicyHash   string
 	ArtifactsDir string
+	TotalTrials  int
 }
 
 // TrialResult represents a trial result with metadata
@@ -54,6 +58,9 @@ type TrialResult struct {
 	ModelHash       string
 	EnvironmentHash string
 	GraderHash      string
+	EvaluationMode  string
+	Population      string
+	Polarity        string
 	ArtifactsDir    string
 	Grades          json.RawMessage
 	InputTokens     int
@@ -83,11 +90,11 @@ type ExperimentReport struct {
 
 // Service orchestrates the grading pipeline
 type Service struct {
-	store           Store
-	graderRegistry  *grader.Registry
-	artifactsRoot   string
-	pollInterval    time.Duration
-	shutdownCh      chan struct{}
+	store          Store
+	graderRegistry *grader.Registry
+	artifactsRoot  string
+	pollInterval   time.Duration
+	shutdownCh     chan struct{}
 }
 
 // NewService creates a new Grading Service
@@ -248,6 +255,65 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	passAtK := computePassAtK(candidateScores)
 	resourceUsage := computeResourceUsage(trials)
 
+	caseMetaByID := make(map[string]metrics.CaseMeta)
+	triggerInputs := make([]metrics.TriggerInput, 0, len(trials))
+	securityFindings := make([]metrics.SecurityFinding, 0)
+	for _, trial := range trials {
+		if trial.EvaluationMode != "" {
+			caseMetaByID[trial.CaseID] = metrics.CaseMeta{
+				CaseID: trial.CaseID, EvaluationMode: trial.EvaluationMode,
+				Population: trial.Population, Polarity: trial.Polarity,
+			}
+		}
+		if trial.EvaluationMode == "autonomous_trigger" {
+			triggerInputs = append(triggerInputs, metrics.TriggerInput{
+				CaseID: trial.CaseID, Arm: trial.Arm, RepetitionIndex: trial.RepetitionIndex,
+				Passed: allGradesPassed(trial.Grades), GradesJSON: trial.Grades,
+			})
+		}
+		if trial.EvaluationMode == "security_probe" && trial.Arm == "with_skill" {
+			finding, findingErr := metrics.LoadSecurityFinding(metrics.FindingPath(s.artifactsRoot, experimentID, trial.TrialID))
+			if findingErr != nil {
+				return fmt.Errorf("failed to load security finding for trial %s: %w", trial.TrialID, findingErr)
+			}
+			finding.CaseID = trial.CaseID
+			if !finding.Present {
+				finding = securityFindingFromGrades(trial.CaseID, trial.Grades)
+			}
+			securityFindings = append(securityFindings, finding)
+		}
+	}
+	caseMeta := make([]metrics.CaseMeta, 0, len(caseMetaByID))
+	for _, meta := range caseMetaByID {
+		caseMeta = append(caseMeta, meta)
+	}
+	triggerResult := metrics.AggregateTrigger(caseMeta, triggerInputs)
+	securityResult := metrics.AggregateSecurity(caseMeta, securityFindings)
+
+	var snapshotLift, snapshotCILower, snapshotCIUpper float64
+	var ciAvailable bool
+	validCases := 0
+	if bootstrapResult != nil {
+		snapshotLift = bootstrapResult.MeanEstimate
+		snapshotCILower = bootstrapResult.CILower
+		snapshotCIUpper = bootstrapResult.CIUpper
+		validCases = bootstrapResult.NCases
+		ciAvailable = bootstrapResult.NCases >= 2 && bootstrapResult.Method != "insufficient_data"
+	}
+	pairingValid := len(pairs) > 0
+	for _, pair := range pairs {
+		if !pair.Valid {
+			pairingValid = false
+			break
+		}
+	}
+	var releaseDecision *releasegate.Decision
+	if experiment.PolicyHash != "" {
+		if _, ok := s.store.(releasegate.Store); !ok {
+			return fmt.Errorf("release gate store is required when policy is configured")
+		}
+	}
+
 	// 8. Generate report
 	reportDir := filepath.Join(s.artifactsRoot, experimentID)
 	generator := report.NewGenerator(reportDir)
@@ -265,6 +331,9 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	)
 	if err != nil {
 		return fmt.Errorf("failed to generate report: %w", err)
+	}
+	if releaseDecision != nil {
+		reportData.Decision = releasegate.ToReportDecision(*releaseDecision)
 	}
 
 	// Save reports
@@ -292,12 +361,12 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	}
 
 	// 9. Save report metadata to database
-	var meanLift, ciLower, ciUpper *float64
+	var meanLift, reportCILower, reportCIUpper *float64
 	var statSig *bool
 	if bootstrapResult != nil {
 		meanLift = &bootstrapResult.MeanEstimate
-		ciLower = &bootstrapResult.CILower
-		ciUpper = &bootstrapResult.CIUpper
+		reportCILower = &bootstrapResult.CILower
+		reportCIUpper = &bootstrapResult.CIUpper
 		sig := bootstrapResult.CILower > 0 || bootstrapResult.CIUpper < 0
 		statSig = &sig
 	}
@@ -321,8 +390,8 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		ValidPairs:               validPairs,
 		InvalidPairs:             invalidPairs,
 		MeanLift:                 meanLift,
-		CILower:                  ciLower,
-		CIUpper:                  ciUpper,
+		CILower:                  reportCILower,
+		CIUpper:                  reportCIUpper,
 		StatisticallySignificant: statSig,
 		CreatedAt:                time.Now(),
 	}
@@ -331,12 +400,136 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		return fmt.Errorf("failed to save report metadata: %w", err)
 	}
 
+	// Evaluate the release gate only after the initial report metadata is saved.
+	// The decision is derived from the frozen snapshot, then the report files are
+	// rewritten with the decision projection and their final hash is persisted.
+	if gateStore, ok := s.store.(releasegate.Store); ok && experiment.PolicyHash != "" {
+		// Attempt to retrieve existing immutable snapshot first
+		snapshot, snapshotErr := gateStore.GetSnapshot(ctx, experimentID)
+		if snapshotErr != nil {
+			// No persisted snapshot exists; build and persist a new one
+			var newSnap releasegate.Snapshot
+			newSnap, snapshotErr = releasegate.BuildSnapshot(releasegate.SnapshotInput{
+				ExperimentID: experimentID, PolicyHash: experiment.PolicyHash,
+				Lift: snapshotLift, CILower: snapshotCILower, CIUpper: snapshotCIUpper,
+				ValidCases: validCases, CIAvailable: ciAvailable, Trigger: triggerResult,
+				Security: securityResult, PairingValid: pairingValid, IdentityValid: true,
+				IncompleteTrials: incompleteTrialCount(trialResults, experiment.TotalTrials),
+				PassAt3: func() float64 {
+					if passAtK != nil {
+						return passAtK["pass@3"]
+					}
+					return 0
+				}(),
+				PassAt3Available: passAtK != nil,
+				TokenDeltaRatio: func() float64 {
+					if resourceUsage != nil {
+						return resourceUsage.TokenDelta.DeltaRatio
+					}
+					return 0
+				}(),
+			})
+			if snapshotErr != nil {
+				return fmt.Errorf("failed to build release snapshot: %w", snapshotErr)
+			}
+			snapshot = &newSnap
+			if err := gateStore.SaveSnapshot(ctx, newSnap); err != nil {
+				return fmt.Errorf("failed to save release snapshot: %w", err)
+			}
+		}
+		decision := releasegate.Evaluate(s.loadPolicy(experiment.PolicyHash), *snapshot)
+		if err := gateStore.SaveDecision(ctx, decision); err != nil {
+			return fmt.Errorf("failed to save release decision: %w", err)
+		}
+		releaseDecision = &decision
+		reportData.Decision = releasegate.ToReportDecision(decision)
+		jsonPath, err = generator.SaveJSON(reportData)
+		if err != nil {
+			return fmt.Errorf("failed to save final JSON report: %w", err)
+		}
+		mdPath, err = generator.SaveMarkdown(reportData)
+		if err != nil {
+			return fmt.Errorf("failed to save final Markdown report: %w", err)
+		}
+		htmlPath, err = generator.SaveHTML(reportData)
+		if err != nil {
+			return fmt.Errorf("failed to save final HTML report: %w", err)
+		}
+		jsonHash, err = hashFile(jsonPath)
+		if err != nil {
+			return fmt.Errorf("failed to hash final JSON report: %w", err)
+		}
+		reportRecord.FilePath, reportRecord.FileHash = jsonPath, jsonHash
+		if err := s.store.SaveReport(ctx, reportRecord); err != nil {
+			return fmt.Errorf("failed to save final report metadata: %w", err)
+		}
+	}
+
 	// 10. Transition experiment to COMPLETED
 	if err := s.store.TransitionExperimentStatus(ctx, experimentID, scheduler.ExperimentGrading, scheduler.ExperimentStatus("COMPLETED")); err != nil {
 		return fmt.Errorf("failed to transition experiment to COMPLETED: %w", err)
 	}
 
 	log.Printf("Experiment %s grading completed", experimentID)
+	return nil
+}
+
+func allGradesPassed(raw json.RawMessage) bool {
+	var manifest grader.GradesManifest
+	if json.Unmarshal(raw, &manifest) != nil {
+		return false
+	}
+	return allGradersPassed(manifest)
+}
+
+func securityFindingFromGrades(caseID string, raw json.RawMessage) metrics.SecurityFinding {
+	var manifest grader.GradesManifest
+	if json.Unmarshal(raw, &manifest) != nil {
+		return metrics.SecurityFinding{CaseID: caseID}
+	}
+	for _, result := range manifest.Graders {
+		severity, _ := result.Evidence["severity"].(string)
+		status, _ := result.Evidence["status"].(string)
+		if severity != "" || status != "" {
+			return metrics.SecurityFinding{CaseID: caseID, Severity: severity, Status: status, Present: true}
+		}
+	}
+	return metrics.SecurityFinding{CaseID: caseID}
+}
+
+func incompleteTrialCount(trialResults []metrics.TrialResult, expected int) int {
+	if expected <= 0 {
+		return 0
+	}
+	if missing := expected - len(trialResults); missing > 0 {
+		return missing
+	}
+	return 0
+}
+
+func (s *Service) loadPolicy(hash string) *strategy.Policy {
+	if hash == "" {
+		return nil
+	}
+	paths := []string{}
+	if path := os.Getenv("SKILLGATE_POLICY_PATH"); path != "" {
+		paths = append(paths, path)
+	}
+	if dir := os.Getenv("SKILLGATE_POLICIES_DIR"); dir != "" {
+		paths = append(paths, filepath.Join(dir, "conservative-release.yaml"))
+	}
+	paths = append(paths, filepath.Join("policies", "conservative-release.yaml"))
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		policy, diags := strategy.ParsePolicyYAML(raw)
+		if policy == nil || len(diags) > 0 || policy.Hash != hash {
+			continue
+		}
+		return policy
+	}
 	return nil
 }
 

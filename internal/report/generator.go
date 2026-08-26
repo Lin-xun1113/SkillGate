@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Lin-xun1113/SkillGate/internal/metrics"
+	"github.com/Lin-xun1113/SkillGate/internal/releasegate"
 	"github.com/Lin-xun1113/SkillGate/internal/statistics"
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -19,15 +20,16 @@ var reportSchemaJSON []byte
 
 // Report represents a complete experiment report
 type Report struct {
-	Schema      string             `json:"schema"`
-	ExperimentID string            `json:"experiment_id"`
-	Metadata    ReportMetadata     `json:"metadata"`
-	Summary     ReportSummary      `json:"summary"`
-	CaseResults []CaseResult       `json:"case_results"`
-	PassAtK     map[string]float64 `json:"pass_at_k,omitempty"`
-	ResourceUsage ResourceUsage    `json:"resource_usage,omitempty"`
-	InvalidPairs []InvalidPair     `json:"invalid_pairs"`
-	StatisticalMethod StatisticalMethod `json:"statistical_method"`
+	Schema            string                      `json:"schema"`
+	ExperimentID      string                      `json:"experiment_id"`
+	Metadata          ReportMetadata              `json:"metadata"`
+	Summary           ReportSummary               `json:"summary"`
+	CaseResults       []CaseResult                `json:"case_results"`
+	PassAtK           map[string]float64          `json:"pass_at_k,omitempty"`
+	ResourceUsage     ResourceUsage               `json:"resource_usage,omitempty"`
+	InvalidPairs      []InvalidPair               `json:"invalid_pairs"`
+	StatisticalMethod StatisticalMethod           `json:"statistical_method"`
+	Decision          *releasegate.ReportDecision `json:"decision,omitempty"`
 }
 
 // ReportMetadata contains report metadata
@@ -41,13 +43,13 @@ type ReportMetadata struct {
 
 // ReportSummary contains aggregate metrics
 type ReportSummary struct {
-	MeanLift                float64 `json:"mean_lift"`
-	CILower                 float64 `json:"ci_lower"`
-	CIUpper                 float64 `json:"ci_upper"`
-	NCases                  int     `json:"n_cases"`
+	MeanLift                 float64 `json:"mean_lift"`
+	CILower                  float64 `json:"ci_lower"`
+	CIUpper                  float64 `json:"ci_upper"`
+	NCases                   int     `json:"n_cases"`
 	StatisticallySignificant bool    `json:"statistically_significant"`
-	Method                  string  `json:"method"`
-	NumResamples            int     `json:"num_resamples"`
+	Method                   string  `json:"method"`
+	NumResamples             int     `json:"num_resamples"`
 }
 
 // CaseResult represents a single case's result
@@ -279,6 +281,16 @@ func (g *Generator) SaveMarkdown(report *Report) (string, error) {
 	} else {
 		md.WriteString("No resource usage data recorded for this experiment.\n\n")
 	}
+	if report.Decision != nil {
+		md.WriteString("## Release Decision\n\n")
+		md.WriteString(fmt.Sprintf("- **Result:** %s\n", report.Decision.Result))
+		md.WriteString(fmt.Sprintf("- **Policy Hash:** %s\n", report.Decision.PolicyHash))
+		md.WriteString(fmt.Sprintf("- **Snapshot Hash:** %s\n", report.Decision.SnapshotHash))
+		if len(report.Decision.MatchedRules) > 0 {
+			md.WriteString(fmt.Sprintf("- **Matched Rules:** %s\n", strings.Join(report.Decision.MatchedRules, ", ")))
+		}
+		md.WriteString(fmt.Sprintf("- **Explanation:** %s\n\n", report.Decision.Explanation))
+	}
 
 	// Statistical Method
 	md.WriteString("## Statistical Method\n\n")
@@ -357,6 +369,17 @@ func (g *Generator) SaveHTML(report *Report) (string, error) {
 			cr.CaseID, cr.BaselineScore, cr.CandidateScore, diffClass, cr.Difference))
 	}
 	html.WriteString("</table>\n")
+
+	if report.Decision != nil {
+		html.WriteString("<h2>Release Decision</h2>\n")
+		html.WriteString(fmt.Sprintf("<ul><li><strong>Result:</strong> %s</li>\n", report.Decision.Result))
+		html.WriteString(fmt.Sprintf("<li><strong>Policy Hash:</strong> %s</li>\n", report.Decision.PolicyHash))
+		html.WriteString(fmt.Sprintf("<li><strong>Snapshot Hash:</strong> %s</li>\n", report.Decision.SnapshotHash))
+		if len(report.Decision.MatchedRules) > 0 {
+			html.WriteString(fmt.Sprintf("<li><strong>Matched Rules:</strong> %s</li>\n", strings.Join(report.Decision.MatchedRules, ", ")))
+		}
+		html.WriteString(fmt.Sprintf("<li><strong>Explanation:</strong> %s</li></ul>\n", report.Decision.Explanation))
+	}
 
 	html.WriteString("</body>\n</html>\n")
 

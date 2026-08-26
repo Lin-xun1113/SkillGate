@@ -142,10 +142,10 @@ func TestValidatePairing(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		candidateTrial  TrialResult
-		wantValid       bool
-		wantReason      string
+		name           string
+		candidateTrial TrialResult
+		wantValid      bool
+		wantReason     string
 	}{
 		{
 			name: "valid pairing",

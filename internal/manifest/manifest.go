@@ -21,6 +21,7 @@ type RuntimePolicy struct {
 type CompiledExperiment struct {
 	ManifestHash string                  `json:"manifest_hash"`
 	SuiteHash    string                  `json:"suite_hash"`
+	PolicyHash   string                  `json:"policy_hash,omitempty"`
 	Pairing      map[string]string       `json:"pairing"`
 	PairCount    int                     `json:"pair_count"`
 	TrialCount   int                     `json:"trial_count"`
@@ -389,7 +390,7 @@ func CompileWithDependencies(manifestPath, projectRoot string, resolver Referenc
 			}
 		}
 	}
-	plan := &CompiledExperiment{ManifestHash: manifestHash, SuiteHash: suiteHash, Pairing: map[string]string{"treatment": "skill_version", "baseline_arm": "without_skill", "candidate_arm": "with_skill"}, Runtime: runtimePolicy, Diagnostics: []validation.Diagnostic{}, Pairs: make([]experiment.PairPlan, 0)}
+	plan := &CompiledExperiment{ManifestHash: manifestHash, SuiteHash: suiteHash, PolicyHash: policyHash, Pairing: map[string]string{"treatment": "skill_version", "baseline_arm": "without_skill", "candidate_arm": "with_skill"}, Runtime: runtimePolicy, Diagnostics: []validation.Diagnostic{}, Pairs: make([]experiment.PairPlan, 0)}
 	for _, raw := range cases {
 		item, ok := raw.(map[string]any)
 		if !ok {
@@ -404,7 +405,7 @@ func CompileWithDependencies(manifestPath, projectRoot string, resolver Referenc
 		}
 		fixtureHash, _ := hasher.Hash(item["fixtures"])
 		for repetition := 1; repetition <= repetitions; repetition++ {
-			pair, err := experiment.CompilePairPlan(experiment.CompileInput{ManifestHash: manifestHash, SuiteHash: suiteHash, CaseID: id, EvaluationMode: mode, Repetition: repetition, ModelHash: modelHash, HarnessHash: harnessHash, EnvironmentHash: environmentIdentity, FixtureHash: fixtureHash, GraderHash: graderHash, ToolPolicyHash: toolPolicyHash})
+			pair, err := experiment.CompilePairPlan(experiment.CompileInput{ManifestHash: manifestHash, SuiteHash: suiteHash, CaseID: id, EvaluationMode: mode, Population: population, Polarity: stringValue(item["polarity"]), Repetition: repetition, ModelHash: modelHash, HarnessHash: harnessHash, EnvironmentHash: environmentIdentity, FixtureHash: fixtureHash, GraderHash: graderHash, ToolPolicyHash: toolPolicyHash})
 			if err != nil {
 				diagnostics = append(diagnostics, validation.Diagnostic{Code: "INVALID_EVALUATION_MODE", Severity: "error", Path: "spec.suite.cases." + id, Message: err.Error()})
 				continue
@@ -418,6 +419,11 @@ func CompileWithDependencies(manifestPath, projectRoot string, resolver Referenc
 	plan.PairCount = len(plan.Pairs)
 	plan.TrialCount = plan.PairCount * 2
 	return plan, nil
+}
+
+func stringValue(value any) string {
+	text, _ := value.(string)
+	return text
 }
 
 func strategyProjection(strategy map[string]any, skills []map[string]any) map[string]any {

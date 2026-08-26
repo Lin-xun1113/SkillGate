@@ -12,6 +12,8 @@ type CompileInput struct {
 	SuiteHash       string
 	CaseID          string
 	EvaluationMode  string
+	Population      string
+	Polarity        string
 	Repetition      int
 	ModelHash       string
 	HarnessHash     string
@@ -28,11 +30,14 @@ type Trial struct {
 }
 
 type PairPlan struct {
-	PairID     string             `json:"pair_id"`
-	CaseID     string             `json:"case_id"`
-	Repetition int                `json:"repetition"`
-	Identity   identity.PairInput `json:"identity"`
-	Trials     []Trial            `json:"trials"`
+	PairID         string             `json:"pair_id"`
+	CaseID         string             `json:"case_id"`
+	EvaluationMode string             `json:"evaluation_mode"`
+	Population     string             `json:"population"`
+	Polarity       string             `json:"polarity"`
+	Repetition     int                `json:"repetition"`
+	Identity       identity.PairInput `json:"identity"`
+	Trials         []Trial            `json:"trials"`
 }
 
 func ValidateTreatment(treatment string) validation.Diagnostic {
@@ -65,5 +70,5 @@ func CompilePairPlan(input CompileInput) (PairPlan, error) {
 	if err != nil {
 		return PairPlan{}, err
 	}
-	return PairPlan{PairID: pairID, CaseID: input.CaseID, Repetition: input.Repetition, Identity: pairInput, Trials: []Trial{{TrialID: without, Arm: "without_skill", Attempt: 1}, {TrialID: with, Arm: "with_skill", Attempt: 1}}}, nil
+	return PairPlan{PairID: pairID, CaseID: input.CaseID, EvaluationMode: input.EvaluationMode, Population: input.Population, Polarity: input.Polarity, Repetition: input.Repetition, Identity: pairInput, Trials: []Trial{{TrialID: without, Arm: "without_skill", Attempt: 1}, {TrialID: with, Arm: "with_skill", Attempt: 1}}}, nil
 }

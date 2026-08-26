@@ -43,13 +43,13 @@ func (s *Store) GetExperimentsInGrading(ctx context.Context) ([]string, error) {
 // GetExperimentByID retrieves an experiment by ID
 func (s *Store) GetExperimentByID(ctx context.Context, experimentID string) (*grading.Experiment, error) {
 	var exp grading.Experiment
-	var graderHash *string
+	var graderHash, policyHash *string
 
 	err := s.pool.QueryRow(ctx, `
-		SELECT experiment_id, grader_hash
+		SELECT experiment_id, grader_hash, policy_hash, total_logical_trials
 		FROM experiments
 		WHERE experiment_id = $1
-	`, experimentID).Scan(&exp.ExperimentID, &graderHash)
+	`, experimentID).Scan(&exp.ExperimentID, &graderHash, &policyHash, &exp.TotalTrials)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -60,6 +60,9 @@ func (s *Store) GetExperimentByID(ctx context.Context, experimentID string) (*gr
 
 	if graderHash != nil {
 		exp.GraderHash = *graderHash
+	}
+	if policyHash != nil {
+		exp.PolicyHash = *policyHash
 	}
 	exp.ArtifactsDir = fmt.Sprintf("artifacts/%s", experimentID)
 
@@ -82,6 +85,9 @@ func (s *Store) GetTrialResults(ctx context.Context, experimentID string) ([]gra
 			COALESCE(lt.model_hash, ''),
 			COALESCE(lt.environment_hash, ''),
 			COALESCE(lt.grader_hash, ''),
+			COALESCE(lt.evaluation_mode, ''),
+			COALESCE(lt.population, ''),
+			COALESCE(lt.polarity, ''),
 			COALESCE(r.grades, '{}'),
 			COALESCE(r.usage, '{}')
 		FROM trial_results r
@@ -111,6 +117,9 @@ func (s *Store) GetTrialResults(ctx context.Context, experimentID string) ([]gra
 			&tr.ModelHash,
 			&tr.EnvironmentHash,
 			&tr.GraderHash,
+			&tr.EvaluationMode,
+			&tr.Population,
+			&tr.Polarity,
 			&grades,
 			&usage,
 		)
