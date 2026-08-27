@@ -38,6 +38,8 @@ func main() {
 		code = schedulerCommand(os.Args[2:])
 	case "serve":
 		code = serveCommand(os.Args[2:])
+	case "ui":
+		code = uiCommand(os.Args[2:])
 	case "--help", "-h":
 		usage()
 	default:
@@ -57,6 +59,7 @@ func usage() {
 	fmt.Println("skillgate trial claim|start|heartbeat|complete [options] [--request-hash <hash>] [--idempotency-key <key>] [--json]")
 	fmt.Println("skillgate scheduler sweep [--limit <n>] [--json]")
 	fmt.Println("skillgate serve [--grpc-addr <addr>] [--database-url <url>] [--json]")
+	fmt.Println("skillgate ui [--listen <addr>] [--database-url <url>] [--json]")
 }
 
 func skillCommand(args []string) int {

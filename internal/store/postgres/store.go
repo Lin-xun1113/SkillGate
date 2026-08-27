@@ -55,6 +55,10 @@ func (s *Store) Close() {
 	}
 }
 
+func (s *Store) Pool() *pgxpool.Pool {
+	return s.pool
+}
+
 func (s *Store) WithJitter(random func(time.Duration) time.Duration) *Store {
 	s.jitter = random
 	return s
