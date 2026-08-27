@@ -100,7 +100,7 @@ h1 {
       <div class="experiment-meta">
         <span class="status status-{{.Status}}">{{.Status}}</span>
         <span class="progress">{{.TerminalCount}} / {{.TotalTrials}} trials</span>
-        <span>{{.CreatedAt}}</span>
+        <span>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</span>
       </div>
     </a>
     {{end}}
@@ -284,7 +284,7 @@ th {
       </div>
       <div class="meta-item">
         <label>Created At</label>
-        <value>{{.Experiment.CreatedAt}}</value>
+        <value>{{.Experiment.CreatedAt.Format "2006-01-02 15:04:05"}}</value>
       </div>
       <div class="meta-item">
         <label>Total Trials</label>
@@ -331,13 +331,13 @@ th {
       {{if .Report.MeanLift}}
       <div class="meta-item">
         <label>Mean Lift</label>
-        <value>{{printf "%.2f%%" (index . "Report" | index "MeanLift" | printf "%v")}}</value>
+        <value>{{formatPercent .Report.MeanLift}}</value>
       </div>
       {{end}}
       {{if .Report.CILower}}
       <div class="meta-item">
         <label>95% CI</label>
-        <value>[{{printf "%.2f" .Report.CILower}}, {{printf "%.2f" .Report.CIUpper}}]</value>
+        <value>[{{formatFloat .Report.CILower}}, {{formatFloat .Report.CIUpper}}]</value>
       </div>
       {{end}}
       {{if .Report.StatisticallySignificant}}
@@ -393,7 +393,7 @@ th {
       </div>
       <div class="meta-item">
         <label>Created At</label>
-        <value>{{.Decision.CreatedAt}}</value>
+        <value>{{.Decision.CreatedAt.Format "2006-01-02 15:04:05"}}</value>
       </div>
     </div>
     <div style="margin-top: 16px;">

@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/Lin-xun1113/SkillGate/internal/store/postgres"
 	"github.com/jackc/pgx/v5"
@@ -72,7 +73,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	type ExperimentRow struct {
 		ID            string
 		Status        string
-		CreatedAt     string
+		CreatedAt     time.Time
 		TotalTrials   int
 		TerminalCount int
 	}
@@ -80,12 +81,10 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	var experiments []ExperimentRow
 	for rows.Next() {
 		var exp ExperimentRow
-		var createdAt interface{}
-		if err := rows.Scan(&exp.ID, &exp.Status, &createdAt, &exp.TotalTrials, &exp.TerminalCount); err != nil {
+		if err := rows.Scan(&exp.ID, &exp.Status, &exp.CreatedAt, &exp.TotalTrials, &exp.TerminalCount); err != nil {
 			s.render500(w, fmt.Sprintf("Failed to scan row: %v", err))
 			return
 		}
-		exp.CreatedAt = fmt.Sprintf("%v", createdAt)
 		experiments = append(experiments, exp)
 	}
 
@@ -116,7 +115,7 @@ func (s *Server) handleExperimentDetail(w http.ResponseWriter, r *http.Request) 
 	var expData struct {
 		ExperimentID   string
 		Status         string
-		CreatedAt      string
+		CreatedAt      time.Time
 		TotalTrials    int
 		TerminalCount  int
 		SucceededCount int
@@ -206,7 +205,7 @@ func (s *Server) handleExperimentDetail(w http.ResponseWriter, r *http.Request) 
 		PolicyVersion string
 		Explanation   string
 		EvidenceLinks []string
-		CreatedAt     string
+		CreatedAt     time.Time
 	}
 	var hasDecision bool
 
@@ -243,7 +242,23 @@ func (s *Server) handleExperimentDetail(w http.ResponseWriter, r *http.Request) 
 		"HasDecision": hasDecision,
 	}
 
-	tmpl := template.Must(template.New("detail").Parse(detailTemplate))
+	// Add helper functions to template
+	funcMap := template.FuncMap{
+		"formatFloat": func(f *float64) string {
+			if f == nil {
+				return "N/A"
+			}
+			return fmt.Sprintf("%.2f", *f)
+		},
+		"formatPercent": func(f *float64) string {
+			if f == nil {
+				return "N/A"
+			}
+			return fmt.Sprintf("%.2f%%", *f*100)
+		},
+	}
+
+	tmpl := template.Must(template.New("detail").Funcs(funcMap).Parse(detailTemplate))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tmpl.Execute(w, data); err != nil {
 		s.render500(w, fmt.Sprintf("Template execution failed: %v", err))

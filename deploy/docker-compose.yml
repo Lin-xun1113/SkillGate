@@ -63,6 +63,24 @@ services:
         condition: service_completed_successfully
     command: ["--server", "control-plane:50051", "--worker-id", "compose-worker-01", "--max-trials", "48", "--delay", "0.02"]
 
+  ui:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    container_name: skillgate-ui
+    environment:
+      SKILLGATE_DATABASE_URL: postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable
+    ports:
+      - "8080:8080"
+    volumes:
+      - artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      control-plane:
+        condition: service_started
+    command: ["ui", "--listen", "0.0.0.0:8080"]
+
 volumes:
   artifacts:
   graders:
