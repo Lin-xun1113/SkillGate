@@ -244,3 +244,163 @@ func findPair(pairs []Pair, caseID string) *Pair {
 	}
 	return nil
 }
+
+func TestPairCasesWithValidation(t *testing.T) {
+	baselineTrials := []TrialResult{
+		{CaseID: "case1", Arm: "baseline", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.7},
+		{CaseID: "case1", Arm: "baseline", RepetitionIndex: 1, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.8},
+		{CaseID: "case2", Arm: "baseline", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.6},
+		{CaseID: "case3", Arm: "baseline", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.8},
+	}
+
+	candidateTrials := []TrialResult{
+		// case1: valid pairing
+		{CaseID: "case1", Arm: "candidate", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.9},
+		{CaseID: "case1", Arm: "candidate", RepetitionIndex: 1, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.95},
+		// case2: model hash mismatch
+		{CaseID: "case2", Arm: "candidate", RepetitionIndex: 0, ModelHash: "m2", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.75},
+		// case3: environment hash mismatch
+		{CaseID: "case3", Arm: "candidate", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e2", GraderHash: "g1", AggregatedScore: 0.95},
+		// case4: missing baseline
+		{CaseID: "case4", Arm: "candidate", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.85},
+	}
+
+	baseline := []CaseScore{
+		{CaseID: "case1", Arm: "baseline", MeanScore: 0.75, Repetitions: 2},
+		{CaseID: "case2", Arm: "baseline", MeanScore: 0.6, Repetitions: 1},
+		{CaseID: "case3", Arm: "baseline", MeanScore: 0.8, Repetitions: 1},
+	}
+
+	candidate := []CaseScore{
+		{CaseID: "case1", Arm: "candidate", MeanScore: 0.925, Repetitions: 2},
+		{CaseID: "case2", Arm: "candidate", MeanScore: 0.75, Repetitions: 1},
+		{CaseID: "case3", Arm: "candidate", MeanScore: 0.95, Repetitions: 1},
+		{CaseID: "case4", Arm: "candidate", MeanScore: 0.85, Repetitions: 1},
+	}
+
+	pairs, err := PairCasesWithValidation(baseline, candidate, baselineTrials, candidateTrials, "baseline", "candidate")
+	if err != nil {
+		t.Fatalf("PairCasesWithValidation failed: %v", err)
+	}
+
+	if len(pairs) != 4 {
+		t.Fatalf("expected 4 pairs, got %d", len(pairs))
+	}
+
+	// Check case1 - valid pairing
+	case1Pair := findPair(pairs, "case1")
+	if case1Pair == nil {
+		t.Fatal("case1 pair not found")
+	}
+	if !case1Pair.Valid {
+		t.Errorf("case1 pair should be valid, got invalid: %s", case1Pair.InvalidReason)
+	}
+
+	// Check case2 - model hash mismatch
+	case2Pair := findPair(pairs, "case2")
+	if case2Pair == nil {
+		t.Fatal("case2 pair not found")
+	}
+	if case2Pair.Valid {
+		t.Error("case2 pair should be invalid (model_mismatch)")
+	}
+	if case2Pair.InvalidReason != "model_mismatch" {
+		t.Errorf("case2 invalid reason = %s, want model_mismatch", case2Pair.InvalidReason)
+	}
+
+	// Check case3 - environment hash mismatch
+	case3Pair := findPair(pairs, "case3")
+	if case3Pair == nil {
+		t.Fatal("case3 pair not found")
+	}
+	if case3Pair.Valid {
+		t.Error("case3 pair should be invalid (environment_mismatch)")
+	}
+	if case3Pair.InvalidReason != "environment_mismatch" {
+		t.Errorf("case3 invalid reason = %s, want environment_mismatch", case3Pair.InvalidReason)
+	}
+
+	// Check case4 - missing baseline
+	case4Pair := findPair(pairs, "case4")
+	if case4Pair == nil {
+		t.Fatal("case4 pair not found")
+	}
+	if case4Pair.Valid {
+		t.Error("case4 pair should be invalid (case_id_mismatch)")
+	}
+	if case4Pair.InvalidReason != "case_id_mismatch" {
+		t.Errorf("case4 invalid reason = %s, want case_id_mismatch", case4Pair.InvalidReason)
+	}
+}
+
+func TestPairCasesWithValidation_GraderHashMismatch(t *testing.T) {
+	baselineTrials := []TrialResult{
+		{CaseID: "case1", Arm: "baseline", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.7},
+	}
+
+	candidateTrials := []TrialResult{
+		{CaseID: "case1", Arm: "candidate", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g2", AggregatedScore: 0.9},
+	}
+
+	baseline := []CaseScore{
+		{CaseID: "case1", Arm: "baseline", MeanScore: 0.7, Repetitions: 1},
+	}
+
+	candidate := []CaseScore{
+		{CaseID: "case1", Arm: "candidate", MeanScore: 0.9, Repetitions: 1},
+	}
+
+	pairs, err := PairCasesWithValidation(baseline, candidate, baselineTrials, candidateTrials, "baseline", "candidate")
+	if err != nil {
+		t.Fatalf("PairCasesWithValidation failed: %v", err)
+	}
+
+	if len(pairs) != 1 {
+		t.Fatalf("expected 1 pair, got %d", len(pairs))
+	}
+
+	pair := pairs[0]
+	if pair.Valid {
+		t.Error("pair should be invalid (grader_mismatch)")
+	}
+	if pair.InvalidReason != "grader_mismatch" {
+		t.Errorf("invalid reason = %s, want grader_mismatch", pair.InvalidReason)
+	}
+}
+
+func TestPairCasesWithValidation_RepetitionIndexMismatch(t *testing.T) {
+	baselineTrials := []TrialResult{
+		{CaseID: "case1", Arm: "baseline", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.7},
+		{CaseID: "case1", Arm: "baseline", RepetitionIndex: 1, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.8},
+	}
+
+	candidateTrials := []TrialResult{
+		{CaseID: "case1", Arm: "candidate", RepetitionIndex: 0, ModelHash: "m1", EnvironmentHash: "e1", GraderHash: "g1", AggregatedScore: 0.9},
+		// Missing repetition 1 in candidate
+	}
+
+	baseline := []CaseScore{
+		{CaseID: "case1", Arm: "baseline", MeanScore: 0.75, Repetitions: 2},
+	}
+
+	candidate := []CaseScore{
+		{CaseID: "case1", Arm: "candidate", MeanScore: 0.9, Repetitions: 1},
+	}
+
+	pairs, err := PairCasesWithValidation(baseline, candidate, baselineTrials, candidateTrials, "baseline", "candidate")
+	if err != nil {
+		t.Fatalf("PairCasesWithValidation failed: %v", err)
+	}
+
+	if len(pairs) != 1 {
+		t.Fatalf("expected 1 pair, got %d", len(pairs))
+	}
+
+	pair := pairs[0]
+	if pair.Valid {
+		t.Error("pair should be invalid (repetition_count_mismatch)")
+	}
+	if pair.InvalidReason != "repetition_count_mismatch" {
+		t.Errorf("invalid reason = %s, want repetition_count_mismatch", pair.InvalidReason)
+	}
+}

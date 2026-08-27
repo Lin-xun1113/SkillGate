@@ -58,6 +58,7 @@ type EvidenceContext struct {
 
 type ExperimentContext struct {
 	PairingValid     bool `json:"pairing_valid"`
+	InvalidPairs     int  `json:"invalid_pairs"`
 	IncompleteTrials int  `json:"incomplete_trials"`
 }
 

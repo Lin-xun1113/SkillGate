@@ -91,8 +91,126 @@ func AggregateCaseScores(trials []TrialResult) ([]CaseScore, error) {
 	return caseScores, nil
 }
 
-// PairCases matches baseline and candidate case scores
+// PairCases matches baseline and candidate case scores and validates pairing rules
 func PairCases(baseline, candidate []CaseScore, baselineArm, candidateArm string) ([]Pair, error) {
+	return pairCasesLegacy(baseline, candidate, baselineArm, candidateArm)
+}
+
+// PairCasesWithValidation matches and validates baseline-candidate pairs using trial-level data
+func PairCasesWithValidation(baseline, candidate []CaseScore, baselineTrials, candidateTrials []TrialResult, baselineArm, candidateArm string) ([]Pair, error) {
+	// Create lookup map for baseline trials by (caseID, repetitionIndex)
+	baselineTrialMap := make(map[string]TrialResult)
+	for _, trial := range baselineTrials {
+		if trial.Arm == baselineArm {
+			key := fmt.Sprintf("%s:%d", trial.CaseID, trial.RepetitionIndex)
+			baselineTrialMap[key] = trial
+		}
+	}
+
+	// Create lookup map for baseline case scores
+	baselineMap := make(map[string]CaseScore)
+	for _, cs := range baseline {
+		if cs.Arm == baselineArm {
+			baselineMap[cs.CaseID] = cs
+		}
+	}
+
+	// Track pairing validation results per case
+	caseValidation := make(map[string]struct {
+		valid         bool
+		invalidReason string
+	})
+
+	// Validate each candidate trial against its baseline counterpart
+	for _, candidateTrial := range candidateTrials {
+		if candidateTrial.Arm != candidateArm {
+			continue
+		}
+
+		key := fmt.Sprintf("%s:%d", candidateTrial.CaseID, candidateTrial.RepetitionIndex)
+		baselineTrial, ok := baselineTrialMap[key]
+		if !ok {
+			// Missing baseline trial for this repetition
+			caseValidation[candidateTrial.CaseID] = struct {
+				valid         bool
+				invalidReason string
+			}{false, "missing_baseline_trial"}
+			continue
+		}
+
+		// Validate pairing using ValidatePairing
+		valid, reason := ValidatePairing(baselineTrial, candidateTrial)
+		if !valid {
+			// Record first validation failure for this case
+			if _, exists := caseValidation[candidateTrial.CaseID]; !exists {
+				caseValidation[candidateTrial.CaseID] = struct {
+					valid         bool
+					invalidReason string
+				}{false, reason}
+			}
+		} else {
+			// Only mark as valid if no previous failure
+			if _, exists := caseValidation[candidateTrial.CaseID]; !exists {
+				caseValidation[candidateTrial.CaseID] = struct {
+					valid         bool
+					invalidReason string
+				}{true, ""}
+			}
+		}
+	}
+
+	// Build pairs from case scores, applying validation results
+	var pairs []Pair
+	for _, candidateCS := range candidate {
+		if candidateCS.Arm != candidateArm {
+			continue
+		}
+
+		baselineCS, ok := baselineMap[candidateCS.CaseID]
+		if !ok {
+			// Case ID not found in baseline
+			pairs = append(pairs, Pair{
+				CaseID:               candidateCS.CaseID,
+				CandidateRepetitions: candidateCS.Repetitions,
+				Valid:                false,
+				InvalidReason:        "case_id_mismatch",
+			})
+			continue
+		}
+
+		// Check validation result
+		validation, hasValidation := caseValidation[candidateCS.CaseID]
+		valid := hasValidation && validation.valid
+		invalidReason := validation.invalidReason
+
+		// Additional check: repetition count mismatch
+		if baselineCS.Repetitions != candidateCS.Repetitions {
+			valid = false
+			if invalidReason == "" {
+				invalidReason = "repetition_count_mismatch"
+			}
+		}
+
+		// Calculate difference
+		diff := candidateCS.MeanScore - baselineCS.MeanScore
+
+		pairs = append(pairs, Pair{
+			CaseID:               candidateCS.CaseID,
+			BaselineScore:        baselineCS.MeanScore,
+			CandidateScore:       candidateCS.MeanScore,
+			Difference:           diff,
+			BaselineRepetitions:  baselineCS.Repetitions,
+			CandidateRepetitions: candidateCS.Repetitions,
+			Valid:                valid,
+			InvalidReason:        invalidReason,
+		})
+	}
+
+	return pairs, nil
+}
+
+// pairCasesLegacy is the original implementation without trial-level validation
+func pairCasesLegacy(baseline, candidate []CaseScore, baselineArm, candidateArm string) ([]Pair, error) {
 	// Create lookup map for baseline
 	baselineMap := make(map[string]CaseScore)
 	for _, cs := range baseline {

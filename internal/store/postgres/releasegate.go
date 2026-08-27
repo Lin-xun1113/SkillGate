@@ -53,11 +53,19 @@ func (s *Store) SaveDecision(ctx context.Context, decision releasegate.Decision)
 	if err != nil {
 		return wrapDatabaseError("marshal decision trace", err)
 	}
+	evidenceLinks, err := json.Marshal(decision.EvidenceLinks)
+	if err != nil {
+		return wrapDatabaseError("marshal evidence links", err)
+	}
 	createdAt := decision.CreatedAt
 	if createdAt.IsZero() {
 		createdAt = time.Now().UTC()
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO release_decisions (decision_id,experiment_id,result,policy_id,policy_version,policy_hash,snapshot_hash,explanation,trace,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (experiment_id) DO UPDATE SET decision_id=EXCLUDED.decision_id,result=EXCLUDED.result,policy_id=EXCLUDED.policy_id,policy_version=EXCLUDED.policy_version,policy_hash=EXCLUDED.policy_hash,snapshot_hash=EXCLUDED.snapshot_hash,explanation=EXCLUDED.explanation,trace=EXCLUDED.trace,created_at=EXCLUDED.created_at`, decision.DecisionID, decision.ExperimentID, string(decision.Result), decision.PolicyID, decision.PolicyVersion, decision.PolicyHash, decision.SnapshotHash, decision.Explanation, trace, createdAt)
+	actor := decision.Actor
+	if actor == "" {
+		actor = "grading-service"
+	}
+	_, err = s.pool.Exec(ctx, `INSERT INTO release_decisions (decision_id,experiment_id,result,policy_id,policy_version,policy_hash,snapshot_hash,explanation,trace,actor,evidence_links,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (experiment_id) DO UPDATE SET decision_id=EXCLUDED.decision_id,result=EXCLUDED.result,policy_id=EXCLUDED.policy_id,policy_version=EXCLUDED.policy_version,policy_hash=EXCLUDED.policy_hash,snapshot_hash=EXCLUDED.snapshot_hash,explanation=EXCLUDED.explanation,trace=EXCLUDED.trace,actor=EXCLUDED.actor,evidence_links=EXCLUDED.evidence_links,created_at=EXCLUDED.created_at`, decision.DecisionID, decision.ExperimentID, string(decision.Result), decision.PolicyID, decision.PolicyVersion, decision.PolicyHash, decision.SnapshotHash, decision.Explanation, trace, actor, evidenceLinks, createdAt)
 	if err != nil {
 		return wrapDatabaseError("save decision", err)
 	}
@@ -68,7 +76,8 @@ func (s *Store) SaveDecision(ctx context.Context, decision releasegate.Decision)
 func (s *Store) GetDecision(ctx context.Context, experimentID string) (*releasegate.Decision, error) {
 	var d releasegate.Decision
 	var trace []byte
-	err := s.pool.QueryRow(ctx, `SELECT decision_id,experiment_id,result,policy_id,policy_version,policy_hash,snapshot_hash,explanation,trace,created_at FROM release_decisions WHERE experiment_id=$1`, experimentID).Scan(&d.DecisionID, &d.ExperimentID, &d.Result, &d.PolicyID, &d.PolicyVersion, &d.PolicyHash, &d.SnapshotHash, &d.Explanation, &trace, &d.CreatedAt)
+	var evidenceLinks []byte
+	err := s.pool.QueryRow(ctx, `SELECT decision_id,experiment_id,result,policy_id,policy_version,policy_hash,snapshot_hash,explanation,trace,actor,evidence_links,created_at FROM release_decisions WHERE experiment_id=$1`, experimentID).Scan(&d.DecisionID, &d.ExperimentID, &d.Result, &d.PolicyID, &d.PolicyVersion, &d.PolicyHash, &d.SnapshotHash, &d.Explanation, &trace, &d.Actor, &evidenceLinks, &d.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("decision not found: %s", experimentID)
@@ -89,6 +98,11 @@ func (s *Store) GetDecision(ctx context.Context, experimentID string) (*releaseg
 		d.EvaluatedRules = payload.EvaluatedRules
 		d.FailedConditions = payload.FailedConditions
 		d.HardGateOverride = payload.HardGateOverride
+	}
+	if len(evidenceLinks) > 0 {
+		if err := json.Unmarshal(evidenceLinks, &d.EvidenceLinks); err != nil {
+			return nil, wrapDatabaseError("decode evidence links", err)
+		}
 	}
 	return &d, nil
 }

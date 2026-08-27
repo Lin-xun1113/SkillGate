@@ -158,8 +158,8 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	// 4. Execute grader for each trial
 	var trialResults []metrics.TrialResult
 	for _, trial := range trials {
-		// Skip if already graded
-		if len(trial.Grades) > 0 {
+		// Skip if already graded - check for actual grader results, not just empty {}
+		if hasActualGrades(trial.Grades) {
 			// Parse existing grades
 			var gradesManifest grader.GradesManifest
 			if err := json.Unmarshal(trial.Grades, &gradesManifest); err == nil {
@@ -231,8 +231,9 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		return fmt.Errorf("failed to aggregate case scores: %w", err)
 	}
 
-	// 6. Pair baseline and candidate
+	// 6. Pair baseline and candidate with trial-level validation
 	var baselineScores, candidateScores []metrics.CaseScore
+	var baselineTrials, candidateTrials []metrics.TrialResult
 	for _, cs := range caseScores {
 		if cs.Arm == "without_skill" {
 			baselineScores = append(baselineScores, cs)
@@ -240,8 +241,15 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 			candidateScores = append(candidateScores, cs)
 		}
 	}
+	for _, trial := range trialResults {
+		if trial.Arm == "without_skill" {
+			baselineTrials = append(baselineTrials, trial)
+		} else if trial.Arm == "with_skill" {
+			candidateTrials = append(candidateTrials, trial)
+		}
+	}
 
-	pairs, err := metrics.PairCases(baselineScores, candidateScores, "without_skill", "with_skill")
+	pairs, err := metrics.PairCasesWithValidation(baselineScores, candidateScores, baselineTrials, candidateTrials, "without_skill", "with_skill")
 	if err != nil {
 		return fmt.Errorf("failed to pair cases: %w", err)
 	}
@@ -301,10 +309,11 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		ciAvailable = bootstrapResult.NCases >= 2 && bootstrapResult.Method != "insufficient_data"
 	}
 	pairingValid := len(pairs) > 0
+	invalidPairCount := 0
 	for _, pair := range pairs {
 		if !pair.Valid {
 			pairingValid = false
-			break
+			invalidPairCount++
 		}
 	}
 	var releaseDecision *releasegate.Decision
@@ -413,7 +422,8 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 				ExperimentID: experimentID, PolicyHash: experiment.PolicyHash,
 				Lift: snapshotLift, CILower: snapshotCILower, CIUpper: snapshotCIUpper,
 				ValidCases: validCases, CIAvailable: ciAvailable, Trigger: triggerResult,
-				Security: securityResult, PairingValid: pairingValid, IdentityValid: true,
+				Security: securityResult, PairingValid: pairingValid, InvalidPairCount: invalidPairCount,
+				IdentityValid: true,
 				IncompleteTrials: incompleteTrialCount(trialResults, experiment.TotalTrials),
 				PassAt3: func() float64 {
 					if passAtK != nil {
@@ -546,6 +556,23 @@ func hashFile(path string) (string, error) {
 
 // allGradersPassed reports whether every grader in the manifest passed
 // (or, if there are none, false — an empty grades manifest is not a pass).
+// hasActualGrades checks if grades JSON contains actual grader results.
+// Returns false for nil, empty {}, or invalid JSON.
+// Returns true only when there are actual grader entries in the manifest.
+func hasActualGrades(gradesJSON []byte) bool {
+	if len(gradesJSON) == 0 {
+		return false
+	}
+
+	var manifest grader.GradesManifest
+	if err := json.Unmarshal(gradesJSON, &manifest); err != nil {
+		return false
+	}
+
+	// Only consider it graded if there are actual grader results
+	return len(manifest.Graders) > 0
+}
+
 func allGradersPassed(manifest grader.GradesManifest) bool {
 	if len(manifest.Graders) == 0 {
 		return false

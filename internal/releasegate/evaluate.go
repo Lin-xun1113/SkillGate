@@ -22,6 +22,8 @@ type Decision struct {
 	FailedConditions []strategy.FailedCondition `json:"failed_conditions"`
 	HardGateOverride *string                    `json:"hard_gate_override"`
 	Explanation      string                     `json:"explanation"`
+	Actor            string                     `json:"actor"`
+	EvidenceLinks    []string                   `json:"evidence_links"`
 	CreatedAt        time.Time                  `json:"created_at"`
 }
 
@@ -36,6 +38,8 @@ func Evaluate(policy *strategy.Policy, snap Snapshot) Decision {
 		MatchedRules:     []string{},
 		EvaluatedRules:   []strategy.EvaluatedRule{},
 		FailedConditions: []strategy.FailedCondition{},
+		Actor:            "grading-service",
+		EvidenceLinks:    buildEvidenceLinks(snap),
 		CreatedAt:        created,
 	}
 	if policy != nil {
@@ -116,6 +120,15 @@ func decisionID(d Decision) string {
 	return "dec_" + hash[len("sha256:"):]
 }
 
+// buildEvidenceLinks constructs URIs for snapshot, report, and artifacts.
+func buildEvidenceLinks(snap Snapshot) []string {
+	links := []string{
+		fmt.Sprintf("snapshot:%s", snap.Hash),
+		fmt.Sprintf("experiment:%s", snap.ExperimentID),
+	}
+	return links
+}
+
 // ReportDecision is the optional report.decision section.
 type ReportDecision struct {
 	Result           string                     `json:"result"`
@@ -128,6 +141,8 @@ type ReportDecision struct {
 	FailedConditions []strategy.FailedCondition `json:"failed_conditions"`
 	HardGateOverride *string                    `json:"hard_gate_override"`
 	Explanation      string                     `json:"explanation"`
+	Actor            string                     `json:"actor"`
+	EvidenceLinks    []string                   `json:"evidence_links"`
 }
 
 // ToReportDecision projects a Decision onto the report schema.
@@ -146,5 +161,7 @@ func ToReportDecision(d Decision) *ReportDecision {
 		FailedConditions: d.FailedConditions,
 		HardGateOverride: d.HardGateOverride,
 		Explanation:      d.Explanation,
+		Actor:            d.Actor,
+		EvidenceLinks:    d.EvidenceLinks,
 	}
 }

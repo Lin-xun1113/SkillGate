@@ -40,6 +40,31 @@ func TestEvaluatePromote(t *testing.T) {
 	if len(got.EvaluatedRules) == 0 {
 		t.Fatal("evaluated rules missing")
 	}
+	if got.Actor == "" {
+		t.Fatal("actor missing")
+	}
+	if got.Actor != "grading-service" {
+		t.Fatalf("expected actor=grading-service, got %s", got.Actor)
+	}
+	if len(got.EvidenceLinks) == 0 {
+		t.Fatal("evidence links missing")
+	}
+	hasSnapshot := false
+	hasExperiment := false
+	for _, link := range got.EvidenceLinks {
+		if len(link) > 9 && link[:9] == "snapshot:" {
+			hasSnapshot = true
+		}
+		if len(link) > 11 && link[:11] == "experiment:" {
+			hasExperiment = true
+		}
+	}
+	if !hasSnapshot {
+		t.Fatal("evidence links missing snapshot reference")
+	}
+	if !hasExperiment {
+		t.Fatal("evidence links missing experiment reference")
+	}
 }
 
 func TestEvaluateRejectCriticalDespitePositiveLift(t *testing.T) {
@@ -142,4 +167,33 @@ func mustConservative(t *testing.T) *strategy.Policy {
 		t.Fatalf("parse: %+v", diags)
 	}
 	return policy
+}
+
+func TestDecisionRoundTripWithActorAndEvidence(t *testing.T) {
+	strategy.ResetCache()
+	policy := mustConservative(t)
+	snap := mustSnap(t, promoteSnapshotInput())
+	
+	// Create a decision with all fields
+	decision := Evaluate(policy, snap)
+	
+	// Verify Actor and EvidenceLinks are populated
+	if decision.Actor != "grading-service" {
+		t.Fatalf("expected actor=grading-service, got %s", decision.Actor)
+	}
+	if len(decision.EvidenceLinks) == 0 {
+		t.Fatal("expected evidence links to be populated")
+	}
+	
+	// Verify ToReportDecision preserves new fields
+	reportDecision := ToReportDecision(decision)
+	if reportDecision == nil {
+		t.Fatal("ToReportDecision returned nil")
+	}
+	if reportDecision.Actor != decision.Actor {
+		t.Fatalf("ToReportDecision lost actor: expected %s, got %s", decision.Actor, reportDecision.Actor)
+	}
+	if len(reportDecision.EvidenceLinks) != len(decision.EvidenceLinks) {
+		t.Fatalf("ToReportDecision lost evidence links: expected %d, got %d", len(decision.EvidenceLinks), len(reportDecision.EvidenceLinks))
+	}
 }

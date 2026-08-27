@@ -95,7 +95,7 @@ VALUES ($1,$2,$3,'QUEUED',$4,clock_timestamp()+($5 * interval '1 millisecond'),$
 			}
 			_, err = tx.Exec(ctx, `
 INSERT INTO logical_trials (
- logical_trial_id, experiment_id, pair_id, arm, status, priority, current_attempt,
+ logical_trial_id, experiment_id, pair_id, arm, status, priority,
  max_attempts, timeout_ms, backoff_base_ms, backoff_cap_ms, retryable_categories,
  case_id, repetition_index, model_hash, environment_hash, grader_hash,
  evaluation_mode, population, polarity

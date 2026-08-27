@@ -178,17 +178,32 @@ class FixtureWorker:
         manifest_bytes = canonical_json_bytes(outcome_manifest).decode("utf-8")
         manifest_hash = sha256_canonical(outcome_manifest)
         idempotency_key = sha256_canonical({"trial_id": claim.trial_id, "result_manifest_hash": manifest_hash})
-        # Declarative artifact manifest: content-addressed metadata only, no
-        # local path. M3 verifies the declared SHA-256 against the manifest;
-        # actual object upload is deferred to M4.
-        artifact_content = f"skillgate fixture output for {claim.trial_id}\n".encode("utf-8")
+
+        # Write actual artifact files to disk.
+        artifacts_root = os.getenv("ARTIFACTS_ROOT", "./artifacts")
+        trial_dir = os.path.join(artifacts_root, claim.experiment_id, claim.trial_id)
+        os.makedirs(trial_dir, exist_ok=True)
+
+        # Write output.txt
+        output_content = f"skillgate fixture output for {claim.trial_id}\n".encode("utf-8")
+        output_path = os.path.join(trial_dir, "output.txt")
+        with open(output_path, "wb") as f:
+            f.write(output_content)
+
+        # Write security-finding.json (empty dict for fixture)
+        finding_content = json.dumps({}).encode("utf-8")
+        finding_path = os.path.join(trial_dir, "security-finding.json")
+        with open(finding_path, "wb") as f:
+            f.write(finding_content)
+
         artifact = runner_pb2.ArtifactManifest(
             artifact_id=f"artifact-{claim.trial_id}",
             kind="fixture-output",
             media_type="text/plain",
-            sha256=f"sha256:{hashlib.sha256(artifact_content).hexdigest()}",
-            size_bytes=len(artifact_content),
+            sha256=f"sha256:{hashlib.sha256(output_content).hexdigest()}",
+            size_bytes=len(output_content),
             created_at_unix_ms=int(time.time() * 1000),
+            local_path=output_path,
         )
         req = runner_pb2.CompleteTrialRequest(
             worker_id=self.worker_id,

@@ -33,15 +33,23 @@ type Grader struct {
 
 // GraderMetadata contains grader metadata
 type GraderMetadata struct {
-	Name string `yaml:"name" json:"name"`
+	Name    string `yaml:"name" json:"name"`
+	Version int    `yaml:"version,omitempty" json:"version,omitempty"`
 }
 
 // GraderSpec contains grader specification
 type GraderSpec struct {
-	Type    GraderType              `yaml:"type" json:"type"`
-	Method  GraderMethod            `yaml:"method" json:"method"`
-	Config  map[string]interface{}  `yaml:"config" json:"config"`
-	Scoring ScoringConfig           `yaml:"scoring" json:"scoring"`
+	Type               GraderType             `yaml:"type" json:"type"`
+	Method             GraderMethod           `yaml:"method" json:"method"`
+	Config             map[string]interface{} `yaml:"config" json:"config"`
+	Scoring            ScoringConfig          `yaml:"scoring" json:"scoring"`
+	Mode               string                 `yaml:"mode,omitempty" json:"mode,omitempty"`
+	LLMJudge           bool                   `yaml:"llmJudge,omitempty" json:"llmJudge,omitempty"`
+	SuiteRef           string                 `yaml:"suiteRef,omitempty" json:"suiteRef,omitempty"`
+	AssertionSemantics string                 `yaml:"assertionSemantics,omitempty" json:"assertionSemantics,omitempty"`
+	SchemaRefs         []string               `yaml:"schemaRefs,omitempty" json:"schemaRefs,omitempty"`
+	ExpectedRefs       []string               `yaml:"expectedRefs,omitempty" json:"expectedRefs,omitempty"`
+	Boundary           map[string]any         `yaml:"boundary,omitempty" json:"boundary,omitempty"`
 }
 
 // ScoringConfig defines how scores are assigned

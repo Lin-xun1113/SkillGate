@@ -1,13 +1,12 @@
 package grader
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
+	"github.com/Lin-xun1113/SkillGate/internal/identity"
 	"gopkg.in/yaml.v3"
 )
 
@@ -34,7 +33,41 @@ func (r *Registry) Register(graderPath string) (string, error) {
 		return "", fmt.Errorf("failed to read grader file: %w", err)
 	}
 
-	// Parse grader
+	// Parse as generic YAML first to check kind and calculate hash
+	var genericDoc map[string]any
+	if err := yaml.Unmarshal(data, &genericDoc); err != nil {
+		return "", fmt.Errorf("failed to parse grader YAML: %w", err)
+	}
+
+	kind, _ := genericDoc["kind"].(string)
+
+	// Handle DeterministicGraderSet by expanding it into a Grader
+	if kind == "DeterministicGraderSet" {
+		grader, err := r.expandDeterministicGraderSet(genericDoc, graderPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to expand DeterministicGraderSet: %w", err)
+		}
+
+		// Validate expanded grader
+		if err := r.validateGrader(grader); err != nil {
+			return "", fmt.Errorf("invalid grader: %w", err)
+		}
+
+		// Calculate hash using canonical JSON (same as manifest compiler)
+		hash, err := r.calculateHash(genericDoc)
+		if err != nil {
+			return "", fmt.Errorf("failed to calculate hash: %w", err)
+		}
+
+		// Store in registry
+		r.mu.Lock()
+		r.graders[hash] = grader
+		r.mu.Unlock()
+
+		return hash, nil
+	}
+
+	// Parse as standard Grader
 	var grader Grader
 	if err := yaml.Unmarshal(data, &grader); err != nil {
 		return "", fmt.Errorf("failed to parse grader YAML: %w", err)
@@ -45,8 +78,11 @@ func (r *Registry) Register(graderPath string) (string, error) {
 		return "", fmt.Errorf("invalid grader: %w", err)
 	}
 
-	// Calculate hash
-	hash := r.calculateHash(data)
+	// Calculate hash using canonical JSON (same as manifest compiler)
+	hash, err := r.calculateHash(genericDoc)
+	if err != nil {
+		return "", fmt.Errorf("failed to calculate hash: %w", err)
+	}
 
 	// Store in registry
 	r.mu.Lock()
@@ -54,6 +90,84 @@ func (r *Registry) Register(graderPath string) (string, error) {
 	r.mu.Unlock()
 
 	return hash, nil
+}
+
+// expandDeterministicGraderSet converts a DeterministicGraderSet into a Grader
+func (r *Registry) expandDeterministicGraderSet(doc map[string]any, graderPath string) (*Grader, error) {
+	metadata, _ := doc["metadata"].(map[string]any)
+	spec, _ := doc["spec"].(map[string]any)
+
+	name, _ := metadata["name"].(string)
+	version := 1
+	if v, ok := metadata["version"].(int); ok {
+		version = v
+	} else if v, ok := metadata["version"].(float64); ok {
+		version = int(v)
+	}
+
+	mode, _ := spec["mode"].(string)
+	llmJudge, _ := spec["llmJudge"].(bool)
+
+	// Build Grader struct
+	grader := &Grader{
+		APIVersion: "skillgate.dev/v1alpha1",
+		Kind:       "Grader",
+		Metadata: GraderMetadata{
+			Name:    name,
+			Version: version,
+		},
+		Spec: GraderSpec{
+			Type:   GraderTypeDeterministic,
+			Method: MethodJSONSchema, // DeterministicGraderSet uses JSON schema validation
+		},
+	}
+
+	// Copy optional fields
+	if mode != "" {
+		grader.Spec.Mode = mode
+	}
+	grader.Spec.LLMJudge = llmJudge
+
+	// Resolve relative references to absolute paths
+	graderDir := filepath.Dir(graderPath)
+
+	if suiteRef, ok := spec["suiteRef"].(string); ok {
+		grader.Spec.SuiteRef = resolveRelativePath(graderDir, suiteRef)
+	}
+
+	if semantics, ok := spec["assertionSemantics"].(string); ok {
+		grader.Spec.AssertionSemantics = semantics
+	}
+
+	if schemaRefs, ok := spec["schemaRefs"].([]any); ok {
+		for _, ref := range schemaRefs {
+			if refStr, ok := ref.(string); ok {
+				grader.Spec.SchemaRefs = append(grader.Spec.SchemaRefs, resolveRelativePath(graderDir, refStr))
+			}
+		}
+	}
+
+	if expectedRefs, ok := spec["expectedRefs"].([]any); ok {
+		for _, ref := range expectedRefs {
+			if refStr, ok := ref.(string); ok {
+				grader.Spec.ExpectedRefs = append(grader.Spec.ExpectedRefs, resolveRelativePath(graderDir, refStr))
+			}
+		}
+	}
+
+	if boundary, ok := spec["boundary"].(map[string]any); ok {
+		grader.Spec.Boundary = boundary
+	}
+
+	return grader, nil
+}
+
+// resolveRelativePath resolves a relative path from a base directory
+func resolveRelativePath(base, ref string) string {
+	if filepath.IsAbs(ref) {
+		return ref
+	}
+	return filepath.Join(base, ref)
 }
 
 // Get retrieves a grader by its hash
@@ -107,10 +221,9 @@ func (r *Registry) LoadFromDirectory(dir string) error {
 	return nil
 }
 
-// calculateHash calculates SHA-256 hash of grader content
-func (r *Registry) calculateHash(data []byte) string {
-	hash := sha256.Sum256(data)
-	return "sha256:" + hex.EncodeToString(hash[:])
+// calculateHash calculates canonical JSON hash (same as manifest compiler)
+func (r *Registry) calculateHash(value any) (string, error) {
+	return identity.HashCanonical(value)
 }
 
 // validateGrader validates grader configuration

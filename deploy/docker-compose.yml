@@ -36,12 +36,15 @@ services:
       DATABASE_URL: postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable
     ports:
       - "50051:50051"
+    volumes:
+      - artifacts:/app/artifacts
+      - graders:/app/graders
     depends_on:
       postgres:
         condition: service_healthy
       bootstrap:
         condition: service_completed_successfully
-    command: ["serve", "--grpc-addr", "0.0.0.0:50051", "--database-url", "postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable"]
+    command: ["serve", "--grpc-addr", "0.0.0.0:50051", "--database-url", "postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable", "--artifacts-dir", "/app/artifacts", "--graders-dir", "/app/graders"]
 
   fixture-worker:
     build:
@@ -50,9 +53,16 @@ services:
     container_name: skillgate-fixture-worker
     environment:
       RUNNER_GRPC_ADDR: control-plane:50051
+      ARTIFACTS_ROOT: /app/artifacts
+    volumes:
+      - artifacts:/app/artifacts
     depends_on:
       control-plane:
         condition: service_started
       bootstrap:
         condition: service_completed_successfully
     command: ["--server", "control-plane:50051", "--worker-id", "compose-worker-01", "--max-trials", "48", "--delay", "0.02"]
+
+volumes:
+  artifacts:
+  graders:

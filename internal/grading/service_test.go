@@ -104,7 +104,7 @@ func TestProcessExperimentBasicFlow(t *testing.T) {
 				CaseID:          "case-001",
 				Arm:             "with_skill",
 				RepetitionIndex: 0,
-				ModelHash:       "model-002",
+				ModelHash:       "model-001",
 				EnvironmentHash: "env-001",
 				GraderHash:      "grader-hash-001",
 				ArtifactsDir:    "artifacts/exp-001/trial-002",
@@ -136,7 +136,7 @@ func TestProcessExperimentBasicFlow(t *testing.T) {
 				CaseID:          "case-002",
 				Arm:             "with_skill",
 				RepetitionIndex: 0,
-				ModelHash:       "model-002",
+				ModelHash:       "model-001",
 				EnvironmentHash: "env-001",
 				GraderHash:      "grader-hash-001",
 				ArtifactsDir:    "artifacts/exp-001/trial-004",
@@ -237,5 +237,154 @@ func TestProcessExperimentBasicFlow(t *testing.T) {
 	case "json", "markdown", "html":
 	default:
 		t.Errorf("ReportType = %q, want one of json/markdown/html (experiment_reports.report_type CHECK constraint)", saved.ReportType)
+	}
+}
+
+func TestHasActualGrades(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected bool
+	}{
+		{
+			name:     "nil grades",
+			input:    nil,
+			expected: false,
+		},
+		{
+			name:     "empty byte slice",
+			input:    []byte{},
+			expected: false,
+		},
+		{
+			name:     "empty JSON object",
+			input:    []byte(`{}`),
+			expected: false,
+		},
+		{
+			name:     "empty graders array",
+			input:    []byte(`{"graders":[],"aggregated_score":0}`),
+			expected: false,
+		},
+		{
+			name:     "actual grader results",
+			input:    []byte(`{"graders":[{"grader_id":"g1","passed":true,"score":1.0}],"aggregated_score":1.0}`),
+			expected: true,
+		},
+		{
+			name:     "invalid JSON",
+			input:    []byte(`{invalid}`),
+			expected: false,
+		},
+		{
+			name:     "only aggregated_score present",
+			input:    []byte(`{"aggregated_score":0.5}`),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasActualGrades(tt.input)
+			if result != tt.expected {
+				t.Errorf("hasActualGrades(%s) = %v, want %v", string(tt.input), result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestEmptyGradesNotSkippedInProcessing(t *testing.T) {
+	// Verify that empty {} grades are treated as "not graded yet"
+	emptyGrades := []byte(`{}`)
+	
+	// This should return false so the trial is not skipped
+	if hasActualGrades(emptyGrades) {
+		t.Error("Empty {} should be treated as not graded yet")
+	}
+	
+	// Verify that after json.Marshal, {} still doesn't have graders
+	var manifest map[string]interface{}
+	json.Unmarshal(emptyGrades, &manifest)
+	marshaled, _ := json.Marshal(manifest)
+	
+	if hasActualGrades(marshaled) {
+		t.Error("Marshaled empty object should still be treated as not graded")
+	}
+}
+
+func TestProcessExperiment_PairingValidationEnforced(t *testing.T) {
+	// Setup mock store with trials that have model hash mismatches
+	store := &mockStore{
+		experiment: &Experiment{
+			ExperimentID: "exp-002",
+			GraderHash:   "grader-hash-001",
+			ArtifactsDir: "artifacts/exp-002",
+		},
+		trials: []TrialResult{
+			{
+				ResultID:        "result-001",
+				TrialID:         "trial-001",
+				LogicalTrialID:  "logical-001",
+				CaseID:          "case-001",
+				Arm:             "without_skill",
+				RepetitionIndex: 0,
+				ModelHash:       "model-001",
+				EnvironmentHash: "env-001",
+				GraderHash:      "grader-hash-001",
+				ArtifactsDir:    "artifacts/exp-002/trial-001",
+				Grades:          json.RawMessage(`{"graders":[{"grader_id":"g1","passed":false,"score":0.0}],"aggregated_score":0.0}`),
+				InputTokens:     100,
+				OutputTokens:    50,
+				LatencyMS:       1000,
+			},
+			{
+				ResultID:        "result-002",
+				TrialID:         "trial-002",
+				LogicalTrialID:  "logical-002",
+				CaseID:          "case-001",
+				Arm:             "with_skill",
+				RepetitionIndex: 0,
+				ModelHash:       "model-002", // Different model hash - should invalidate pair
+				EnvironmentHash: "env-001",
+				GraderHash:      "grader-hash-001",
+				ArtifactsDir:    "artifacts/exp-002/trial-002",
+				Grades:          json.RawMessage(`{"graders":[{"grader_id":"g1","passed":true,"score":1.0}],"aggregated_score":1.0}`),
+				InputTokens:     120,
+				OutputTokens:    60,
+				LatencyMS:       900,
+			},
+		},
+	}
+
+	registry := grader.NewRegistry("/tmp/graders")
+	service := NewService(store, registry, "/tmp/artifacts", 5*time.Second)
+
+	// Process experiment
+	ctx := context.Background()
+	err := service.ProcessExperiment(ctx, "exp-002")
+
+	if err != nil {
+		t.Fatalf("ProcessExperiment failed: %v", err)
+	}
+
+	// Verify report was saved
+	if len(store.savedReports) != 1 {
+		t.Fatalf("expected 1 saved report, got %d", len(store.savedReports))
+	}
+
+	report := store.savedReports[0]
+
+	// Should have 0 valid pairs and 1 invalid pair due to model hash mismatch
+	if report.ValidPairs != 0 {
+		t.Errorf("expected 0 valid pairs, got %d", report.ValidPairs)
+	}
+
+	if report.InvalidPairs != 1 {
+		t.Errorf("expected 1 invalid pair (model_mismatch), got %d", report.InvalidPairs)
+	}
+
+	// Lift should be 0 since there are no valid pairs
+	if report.MeanLift != nil && *report.MeanLift != 0 {
+		t.Errorf("expected mean_lift to be 0 or nil with no valid pairs, got %f", *report.MeanLift)
 	}
 }

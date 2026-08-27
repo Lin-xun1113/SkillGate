@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ type ServiceOptions struct {
 	HeartbeatInterval  time.Duration
 	MaxLeaseDuration   time.Duration
 	Projector          ExecutionProjector // M4: optional execution content projector
+	ArtifactsRoot      string             // Root directory for artifact storage validation
 }
 
 // ExecutionProjector resolves manifest_hash to execution content.
@@ -338,7 +340,7 @@ func (s *RunnerService) CompleteTrial(ctx context.Context, req *runnerv1.Complet
 	if req.RequestHash == "" || req.IdempotencyKey == "" {
 		return &runnerv1.CompleteTrialResponse{Status: runnerv1.CompletionStatus_COMPLETION_STATUS_INVALID_REQUEST, Message: "request_hash and idempotency_key are required"}, nil
 	}
-	if err := validateArtifactManifests(req.Artifacts); err != nil {
+	if err := s.validateArtifactManifests(req.Artifacts); err != nil {
 		return &runnerv1.CompleteTrialResponse{Status: runnerv1.CompletionStatus_COMPLETION_STATUS_INVALID_REQUEST, Message: err.Error()}, nil
 	}
 	manifestHash, err := scheduler.ResultManifestHash(manifestBytes)
@@ -493,7 +495,7 @@ func parseOutcome(out string) scheduler.Outcome {
 	}
 }
 
-func validateArtifactManifests(artifacts []*runnerv1.ArtifactManifest) error {
+func (s *RunnerService) validateArtifactManifests(artifacts []*runnerv1.ArtifactManifest) error {
 	for _, artifact := range artifacts {
 		if artifact == nil || artifact.ArtifactId == "" || artifact.Sha256 == "" || artifact.SizeBytes < 0 {
 			return fmt.Errorf("artifact manifest requires artifact_id, sha256 and non-negative size_bytes")
@@ -501,6 +503,14 @@ func validateArtifactManifests(artifacts []*runnerv1.ArtifactManifest) error {
 		if artifact.LocalPath == "" {
 			continue
 		}
+
+		// Validate path is within artifacts root
+		if s.opts.ArtifactsRoot != "" {
+			if ok, err := isWithinArtifactsRoot(artifact.LocalPath, s.opts.ArtifactsRoot); !ok {
+				return fmt.Errorf("artifact %s path validation failed: %w", artifact.ArtifactId, err)
+			}
+		}
+
 		file, err := os.Open(artifact.LocalPath)
 		if err != nil {
 			return fmt.Errorf("artifact %s cannot be opened: %w", artifact.ArtifactId, err)
@@ -526,6 +536,72 @@ func validateArtifactManifests(artifacts []*runnerv1.ArtifactManifest) error {
 		}
 	}
 	return nil
+}
+
+// isWithinArtifactsRoot checks if the given path is within the allowed artifacts root.
+// It resolves symlinks, cleans paths, and rejects any path traversal attempts.
+func isWithinArtifactsRoot(targetPath, artifactsRoot string) (bool, error) {
+	if targetPath == "" {
+		return false, fmt.Errorf("target path is empty")
+	}
+	if artifactsRoot == "" {
+		return false, fmt.Errorf("artifacts root is not configured")
+	}
+
+	// Resolve and clean the artifacts root
+	cleanRoot, err := filepath.EvalSymlinks(artifactsRoot)
+	if err != nil {
+		cleanRoot = filepath.Clean(artifactsRoot)
+	}
+	cleanRoot = filepath.Clean(cleanRoot)
+	if !strings.HasSuffix(cleanRoot, string(filepath.Separator)) {
+		cleanRoot += string(filepath.Separator)
+	}
+
+	// Build the full path
+	var fullPath string
+	if filepath.IsAbs(targetPath) {
+		fullPath = targetPath
+	} else {
+		fullPath = filepath.Join(artifactsRoot, targetPath)
+	}
+
+	// Clean and resolve the target path
+	cleanTarget := filepath.Clean(fullPath)
+
+	// Resolve symlinks if the path exists
+	if resolved, err := filepath.EvalSymlinks(fullPath); err == nil {
+		cleanTarget = resolved
+	} else {
+		// If path doesn't exist, resolve as much of the path as possible
+		// Walk up the directory tree until we find an existing ancestor
+		checkPath := fullPath
+		for {
+			parentDir := filepath.Dir(checkPath)
+			if parentDir == checkPath || parentDir == "." || parentDir == "/" {
+				break
+			}
+
+			if resolvedParent, err := filepath.EvalSymlinks(parentDir); err == nil {
+				// Found an existing ancestor, rebuild the path with it
+				relPath, err := filepath.Rel(parentDir, fullPath)
+				if err == nil {
+					cleanTarget = filepath.Join(resolvedParent, relPath)
+					cleanTarget = filepath.Clean(cleanTarget)
+				}
+				break
+			}
+
+			checkPath = parentDir
+		}
+	}
+
+	// Ensure the resolved path starts with the resolved root
+	if !strings.HasPrefix(cleanTarget, cleanRoot) {
+		return false, fmt.Errorf("path escapes artifacts root: %s", targetPath)
+	}
+
+	return true, nil
 }
 
 func jsonOrEmpty(raw string) []byte {

@@ -48,12 +48,12 @@ class LangGraphWorker:
             # Build registration request
             request = runner_pb2.RegisterWorkerRequest(
                 worker_id=self.worker_id,
-                protocol_version="v1",
+                protocol_version="runner.v1",
                 worker_version="0.1.0",
                 capabilities=runner_pb2.WorkerCapabilities(
                     harnesses=["langgraph"],
                     graders=[],
-                    sandbox_profiles=["docker"],
+                    sandbox_profiles=["docker-restricted-v1"],
                     max_concurrency=1
                 ),
                 environment=runner_pb2.WorkerEnvironment(
@@ -134,7 +134,7 @@ class LangGraphWorker:
             logger.error(f"Execution hash mismatch: expected {trial.get('execution_hash')}, got {execution_hash}")
             return False
 
-        logger.info(f"Hash verification passed: request={request_hash[:8]}, execution={execution_hash[:8]}")
+        logger.info(f"Hash verification passed: request={request_hash}, execution={execution_hash}")
         return True
 
     def _compute_request_hash(self, trial: Dict[str, Any]) -> str:
@@ -146,7 +146,7 @@ class LangGraphWorker:
             "attempt": trial.get("attempt"),
         }
         canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
-        return hashlib.sha256(canonical.encode()).hexdigest()[:8]
+        return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
 
     def _compute_execution_hash(self, execution: Dict[str, Any]) -> str:
         """Compute M4 execution_hash."""
@@ -160,7 +160,7 @@ class LangGraphWorker:
             "evaluator": execution.get("evaluator", {}),
         }
         canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
-        return hashlib.sha256(canonical.encode()).hexdigest()[:8]
+        return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
 
     def load_skill(self, skill_hash: str) -> Optional[Dict[str, Any]]:
         """Load and verify skill from CAS."""
@@ -180,7 +180,7 @@ class LangGraphWorker:
             logger.error(f"Skill hash mismatch: expected {skill_hash}, got {computed_hash}")
             raise ValueError(f"Skill hash verification failed: expected {skill_hash}, got {computed_hash}")
 
-        logger.info(f"Loaded and verified skill {skill_hash[:8]} from CAS")
+        logger.info(f"Loaded and verified skill {skill_hash} from CAS")
         # TODO: Parse YAML and return skill definition
         return {"content": content.decode(), "hash": skill_hash}
 
@@ -346,24 +346,6 @@ class LangGraphWorker:
                     output_tokens=0,
                     elapsed_ms=int(time.time() * 1000) - started_at_unix_ms,
                 ),
-            )
-
-            response = self.stub.Heartbeat(request)
-
-            # Check for cancellation signal
-            if response.should_cancel:
-                logger.info(f"Trial {trial_id} cancellation requested")
-                self.cancelled = True
-                return False
-
-            return True
-
-        except grpc.RpcError as e:
-            logger.error(f"Heartbeat RPC failed: {e.code()} - {e.details()}")
-            return False
-                    tool_calls=0,
-                    peak_memory_bytes=0
-                )
             )
 
             response = self.stub.Heartbeat(request)

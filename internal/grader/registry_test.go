@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestRegistry(t *testing.T) {
@@ -153,4 +155,226 @@ func TestValidateGrader(t *testing.T) {
 
 func startsWith(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+func TestDeterministicGraderSet(t *testing.T) {
+	tmpDir := t.TempDir()
+	registry := NewRegistry(tmpDir)
+
+	// Create a DeterministicGraderSet file (same as evals/csv-analysis/grader.yaml)
+	graderContent := `apiVersion: skillgate.dev/v1alpha1
+kind: DeterministicGraderSet
+metadata:
+  name: csv-analysis-grader
+  version: 1
+spec:
+  mode: deterministic_only
+  llmJudge: false
+  suiteRef: ./suite.yaml
+  assertionSemantics: suite-assertions-v1
+  schemaRefs:
+    - schemas/monthly-summary.schema.json
+    - schemas/insight.schema.json
+  expectedRefs:
+    - expected/monthly-summary.json
+    - expected/insight.json
+  boundary:
+    expectedRoot: /grader-only/expected
+    agentVisibleExpected: false
+`
+
+	graderPath := filepath.Join(tmpDir, "grader.yaml")
+	if err := os.WriteFile(graderPath, []byte(graderContent), 0644); err != nil {
+		t.Fatalf("failed to write test grader: %v", err)
+	}
+
+	// Test Register with DeterministicGraderSet
+	hash, err := registry.Register(graderPath)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	if hash == "" {
+		t.Fatal("Register returned empty hash")
+	}
+
+	if !startsWith(hash, "sha256:") {
+		t.Errorf("hash should start with 'sha256:', got: %s", hash)
+	}
+
+	// Test Get - should return expanded Grader
+	grader, err := registry.Get(hash)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+
+	// Verify expanded grader has correct fields
+	if grader.Kind != "Grader" {
+		t.Errorf("expected kind 'Grader', got: %s", grader.Kind)
+	}
+
+	if grader.Metadata.Name != "csv-analysis-grader" {
+		t.Errorf("expected name 'csv-analysis-grader', got: %s", grader.Metadata.Name)
+	}
+
+	if grader.Metadata.Version != 1 {
+		t.Errorf("expected version 1, got: %d", grader.Metadata.Version)
+	}
+
+	if grader.Spec.Type != GraderTypeDeterministic {
+		t.Errorf("expected type deterministic, got: %s", grader.Spec.Type)
+	}
+
+	if grader.Spec.Method != MethodJSONSchema {
+		t.Errorf("expected method json_schema, got: %s", grader.Spec.Method)
+	}
+
+	if grader.Spec.Mode != "deterministic_only" {
+		t.Errorf("expected mode 'deterministic_only', got: %s", grader.Spec.Mode)
+	}
+
+	if grader.Spec.LLMJudge != false {
+		t.Errorf("expected llmJudge false, got: %v", grader.Spec.LLMJudge)
+	}
+
+	if len(grader.Spec.SchemaRefs) != 2 {
+		t.Errorf("expected 2 schema refs, got: %d", len(grader.Spec.SchemaRefs))
+	}
+
+	if len(grader.Spec.ExpectedRefs) != 2 {
+		t.Errorf("expected 2 expected refs, got: %d", len(grader.Spec.ExpectedRefs))
+	}
+}
+
+func TestHashMatchesManifestCompiler(t *testing.T) {
+	// This test verifies that the registry's hash matches the manifest compiler's hash
+	tmpDir := t.TempDir()
+	registry := NewRegistry(tmpDir)
+
+	graderContent := `apiVersion: skillgate.dev/v1alpha1
+kind: Grader
+metadata:
+  name: test-grader
+spec:
+  type: deterministic
+  method: json_schema
+  config:
+    schema_path: ./schema.json
+  scoring:
+    passed_score: 1.0
+    failed_score: 0.0
+`
+
+	graderPath := filepath.Join(tmpDir, "grader.yaml")
+	if err := os.WriteFile(graderPath, []byte(graderContent), 0644); err != nil {
+		t.Fatalf("failed to write test grader: %v", err)
+	}
+
+	// Get hash from registry
+	registryHash, err := registry.Register(graderPath)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	// Manually calculate hash using the same method as manifest compiler
+	data, err := os.ReadFile(graderPath)
+	if err != nil {
+		t.Fatalf("failed to read grader file: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := unmarshalYAML(data, &parsed); err != nil {
+		t.Fatalf("failed to parse YAML: %v", err)
+	}
+
+	manifestHash, err := registry.calculateHash(parsed)
+	if err != nil {
+		t.Fatalf("failed to calculate manifest hash: %v", err)
+	}
+
+	// Verify they match
+	if registryHash != manifestHash {
+		t.Errorf("hash mismatch:\n  registry: %s\n  manifest: %s", registryHash, manifestHash)
+	}
+
+	// Verify the grader can be retrieved by the hash
+	grader, err := registry.Get(registryHash)
+	if err != nil {
+		t.Errorf("Get failed with registry hash: %v", err)
+	}
+	if grader == nil {
+		t.Error("grader is nil")
+	}
+}
+
+func unmarshalYAML(data []byte, v any) error {
+	return yaml.Unmarshal(data, v)
+}
+
+func TestRealCSVAnalysisGrader(t *testing.T) {
+	// Test with the actual csv-analysis grader.yaml
+	graderPath := "../../evals/csv-analysis/grader.yaml"
+	
+	// Check if file exists
+	if _, err := os.Stat(graderPath); os.IsNotExist(err) {
+		t.Skip("csv-analysis grader.yaml not found, skipping test")
+	}
+	
+	registry := NewRegistry("")
+	
+	// Test 1: Register the grader
+	hash, err := registry.Register(graderPath)
+	if err != nil {
+		t.Fatalf("Failed to register grader: %v", err)
+	}
+	
+	t.Logf("Registry hash: %s", hash)
+	
+	// Test 2: Calculate hash using manifest compiler method (identity.HashCanonical)
+	data, err := os.ReadFile(graderPath)
+	if err != nil {
+		t.Fatalf("Failed to read grader file: %v", err)
+	}
+	
+	var parsed map[string]any
+	if err := yaml.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("Failed to parse YAML: %v", err)
+	}
+	
+	manifestHash, err := registry.calculateHash(parsed)
+	if err != nil {
+		t.Fatalf("Failed to calculate manifest hash: %v", err)
+	}
+	
+	t.Logf("Manifest hash: %s", manifestHash)
+	
+	// Test 3: Verify hashes match
+	if hash != manifestHash {
+		t.Errorf("Hash mismatch:\n  registry: %s\n  manifest: %s", hash, manifestHash)
+	}
+	
+	// Test 4: Verify grader can be retrieved
+	grader, err := registry.Get(hash)
+	if err != nil {
+		t.Fatalf("Failed to get grader: %v", err)
+	}
+	
+	// Verify the expanded grader structure
+	if grader.Kind != "Grader" {
+		t.Errorf("expected kind 'Grader', got: %s", grader.Kind)
+	}
+	
+	if grader.Metadata.Name != "csv-analysis-grader" {
+		t.Errorf("expected name 'csv-analysis-grader', got: %s", grader.Metadata.Name)
+	}
+	
+	if grader.Spec.Type != GraderTypeDeterministic {
+		t.Errorf("expected type deterministic, got: %s", grader.Spec.Type)
+	}
+	
+	if grader.Spec.Method != MethodJSONSchema {
+		t.Errorf("expected method json_schema, got: %s", grader.Spec.Method)
+	}
+	
+	t.Logf("✅ Grader retrieved successfully: %s (%s/%s)", grader.Metadata.Name, grader.Spec.Type, grader.Spec.Method)
 }

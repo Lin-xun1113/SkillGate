@@ -22,6 +22,7 @@ type Snapshot struct {
 	Evidence     strategy.EvidenceContext    `json:"evidence"`
 	Experiment   strategy.ExperimentContext  `json:"experiment"`
 	Hash         string                      `json:"-"`
+	ReportPath   string                      `json:"report_path,omitempty"`
 }
 
 // SnapshotInput is the raw aggregation input used to build a Snapshot.
@@ -40,6 +41,7 @@ type SnapshotInput struct {
 	TokenDeltaRatio  float64
 	IdentityValid    bool
 	PairingValid     bool
+	InvalidPairCount int
 	IncompleteTrials int
 }
 
@@ -74,6 +76,7 @@ func BuildSnapshot(in SnapshotInput) (Snapshot, error) {
 		},
 		Experiment: strategy.ExperimentContext{
 			PairingValid:     in.PairingValid,
+			InvalidPairs:     in.InvalidPairCount,
 			IncompleteTrials: in.IncompleteTrials,
 		},
 	}
