@@ -213,7 +213,7 @@ func (s *Server) handleExperimentDetail(w http.ResponseWriter, r *http.Request) 
 	var evidenceLinksJSON []byte
 	err = s.store.Pool().QueryRow(ctx, `
 		SELECT result, policy_id, policy_version, explanation,
-		       COALESCE((SELECT json_agg(link) FROM unnest(evidence_links) AS link), '[]'::json),
+		       COALESCE(evidence_links, '[]'::jsonb),
 		       created_at
 		FROM release_decisions
 		WHERE experiment_id = $1
