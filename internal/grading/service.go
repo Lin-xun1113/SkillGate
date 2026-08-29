@@ -5,20 +5,29 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Lin-xun1113/SkillGate/internal/grader"
+	"github.com/Lin-xun1113/SkillGate/internal/identity"
 	"github.com/Lin-xun1113/SkillGate/internal/metrics"
 	"github.com/Lin-xun1113/SkillGate/internal/releasegate"
 	"github.com/Lin-xun1113/SkillGate/internal/report"
 	"github.com/Lin-xun1113/SkillGate/internal/scheduler"
 	"github.com/Lin-xun1113/SkillGate/internal/statistics"
 	"github.com/Lin-xun1113/SkillGate/internal/strategy"
+	"gopkg.in/yaml.v3"
 )
+
+// ErrIncompleteEvidence is returned after a report has been persisted when a
+// required artifact/grade is missing. Callers can retry grading; importantly,
+// the experiment is not transitioned to COMPLETED on an incomplete result.
+var ErrIncompleteEvidence = errors.New("grading evidence incomplete")
 
 // Store defines the database operations needed by the Grading Service
 type Store interface {
@@ -66,6 +75,8 @@ type TrialResult struct {
 	InputTokens     int
 	OutputTokens    int
 	LatencyMS       int
+	ToolCalls       int
+	CostUSD         float64
 }
 
 // ExperimentReport represents a report record. ReportType must be one of
@@ -155,14 +166,35 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		return fmt.Errorf("failed to get trial results: %w", err)
 	}
 
-	// 4. Execute grader for each trial
+	// 4. Execute grader for each trial. Only scored manifests contribute to
+	// utility metrics; incomplete/invalid evidence is retained in the report but
+	// cannot be turned into a zero score.
 	var trialResults []metrics.TrialResult
+	incompleteReasons := make([]string, 0)
+	appendIncomplete := func(trial TrialResult, reason string) {
+		if reason == "" {
+			reason = "missing or invalid grader evidence"
+		}
+		incompleteReasons = append(incompleteReasons, trial.TrialID+": "+reason)
+	}
 	for _, trial := range trials {
 		// Skip if already graded - check for actual grader results, not just empty {}
 		if hasActualGrades(trial.Grades) {
 			// Parse existing grades
 			var gradesManifest grader.GradesManifest
 			if err := json.Unmarshal(trial.Grades, &gradesManifest); err == nil {
+				if reason := validateGradesManifest(gradesManifest, experiment.GraderHash); reason != "" {
+					appendIncomplete(trial, reason)
+					continue
+				}
+				status := gradesManifest.Status
+				if status == "" {
+					status = "scored"
+				}
+				if status != "scored" {
+					appendIncomplete(trial, "grades status="+status)
+					continue
+				}
 				trialResults = append(trialResults, metrics.TrialResult{
 					TrialID:         trial.TrialID,
 					LogicalTrialID:  trial.LogicalTrialID,
@@ -173,20 +205,28 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 					ModelHash:       trial.ModelHash,
 					EnvironmentHash: trial.EnvironmentHash,
 					GraderHash:      trial.GraderHash,
+					EvaluationMode:  trial.EvaluationMode,
+					Population:      trial.Population,
+					Polarity:        trial.Polarity,
+					EvidenceStatus:  status,
 					AggregatedScore: gradesManifest.AggregatedScore,
 					Passed:          allGradersPassed(gradesManifest),
 					InputTokens:     trial.InputTokens,
 					OutputTokens:    trial.OutputTokens,
 					LatencyMS:       trial.LatencyMS,
+					ToolCalls:       trial.ToolCalls,
+					CostUSD:         trial.CostUSD,
 				})
+			} else {
+				appendIncomplete(trial, "grades JSON is invalid")
 			}
 			continue
 		}
 
 		// Execute grader (returns a single GradeResult)
-		result, err := executor.Execute(ctx, experiment.GraderHash, experimentID, trial.TrialID)
+		result, err := executor.ExecuteTrial(ctx, experiment.GraderHash, experimentID, trial.TrialID, trial.CaseID)
 		if err != nil {
-			log.Printf("Grading failed for trial %s: %v", trial.TrialID, err)
+			appendIncomplete(trial, err.Error())
 			continue
 		}
 
@@ -195,6 +235,11 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		gradesManifest := grader.GradesManifest{
 			Graders:         []grader.GradeResult{*result},
 			AggregatedScore: result.Score,
+			Status:          result.Status,
+			GraderHash:      result.GraderHash,
+			GraderVersion:   result.GraderVersion,
+			InputHash:       result.InputHash,
+			EvidenceHash:    result.EvidenceHash,
 		}
 
 		gradesJSON, err := json.Marshal(gradesManifest)
@@ -205,6 +250,18 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		// Save grades to database
 		if err := s.store.UpdateTrialGrades(ctx, trial.ResultID, gradesJSON); err != nil {
 			return fmt.Errorf("failed to save grades: %w", err)
+		}
+		// Keep the in-memory projection in sync for trigger/security aggregation
+		// later in this pass; the database write is authoritative on retries.
+		for i := range trials {
+			if trials[i].TrialID == trial.TrialID {
+				trials[i].Grades = append(json.RawMessage(nil), gradesJSON...)
+				break
+			}
+		}
+		if result.Status != "scored" {
+			appendIncomplete(trial, result.Message)
+			continue
 		}
 
 		trialResults = append(trialResults, metrics.TrialResult{
@@ -217,16 +274,35 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 			ModelHash:       trial.ModelHash,
 			EnvironmentHash: trial.EnvironmentHash,
 			GraderHash:      trial.GraderHash,
+			EvaluationMode:  trial.EvaluationMode,
+			Population:      trial.Population,
+			Polarity:        trial.Polarity,
+			EvidenceStatus:  result.Status,
 			AggregatedScore: result.Score,
 			Passed:          result.Passed,
 			InputTokens:     trial.InputTokens,
 			OutputTokens:    trial.OutputTokens,
 			LatencyMS:       trial.LatencyMS,
+			ToolCalls:       trial.ToolCalls,
+			CostUSD:         trial.CostUSD,
 		})
 	}
+	missingTrialCount := 0
+	if missing := incompleteTrialCount(trialResults, experiment.TotalTrials); missing > 0 {
+		missingTrialCount = missing
+		incompleteReasons = append(incompleteReasons, fmt.Sprintf("%d trial result(s) lack scored grades", missing))
+	}
 
-	// 5. Aggregate metrics
-	caseScores, err := metrics.AggregateCaseScores(trialResults)
+	// 5. Aggregate utility metrics. Forced-injection answer cases are the only
+	// population that contributes to Skill Lift; trigger/security populations are
+	// reported separately below.
+	utilityTrials := make([]metrics.TrialResult, 0, len(trialResults))
+	for _, trial := range trialResults {
+		if trial.EvaluationMode == "" || (trial.EvaluationMode == "forced_injection" && (trial.Population == "" || trial.Population == "answer")) {
+			utilityTrials = append(utilityTrials, trial)
+		}
+	}
+	caseScores, err := metrics.AggregateCaseScores(utilityTrials)
 	if err != nil {
 		return fmt.Errorf("failed to aggregate case scores: %w", err)
 	}
@@ -273,7 +349,7 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 				Population: trial.Population, Polarity: trial.Polarity,
 			}
 		}
-		if trial.EvaluationMode == "autonomous_trigger" {
+		if trial.EvaluationMode == "autonomous_trigger" && trialHasScoredGrades(trial.Grades) {
 			triggerInputs = append(triggerInputs, metrics.TriggerInput{
 				CaseID: trial.CaseID, Arm: trial.Arm, RepetitionIndex: trial.RepetitionIndex,
 				Passed: allGradesPassed(trial.Grades), GradesJSON: trial.Grades,
@@ -282,7 +358,10 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		if trial.EvaluationMode == "security_probe" && trial.Arm == "with_skill" {
 			finding, findingErr := metrics.LoadSecurityFinding(metrics.FindingPath(s.artifactsRoot, experimentID, trial.TrialID))
 			if findingErr != nil {
-				return fmt.Errorf("failed to load security finding for trial %s: %w", trial.TrialID, findingErr)
+				// A malformed scanner artifact is incomplete evidence, not a control
+				// plane crash. Preserve the diagnostic and let the release gate HOLD.
+				incompleteReasons = append(incompleteReasons, fmt.Sprintf("%s: invalid security finding: %v", trial.TrialID, findingErr))
+				finding = metrics.SecurityFinding{}
 			}
 			finding.CaseID = trial.CaseID
 			if !finding.Present {
@@ -297,6 +376,12 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	}
 	triggerResult := metrics.AggregateTrigger(caseMeta, triggerInputs)
 	securityResult := metrics.AggregateSecurity(caseMeta, securityFindings)
+	if triggerResult.IncompleteCases > 0 {
+		incompleteReasons = append(incompleteReasons, fmt.Sprintf("trigger evidence incomplete for %d case(s)", triggerResult.IncompleteCases))
+	}
+	if securityResult.MissingEvidence > 0 {
+		incompleteReasons = append(incompleteReasons, fmt.Sprintf("security evidence missing for %d case(s)", securityResult.MissingEvidence))
+	}
 
 	var snapshotLift, snapshotCILower, snapshotCIUpper float64
 	var ciAvailable bool
@@ -316,6 +401,7 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 			invalidPairCount++
 		}
 	}
+	identityValid := validateTrialIdentities(trials, experiment.GraderHash)
 	var releaseDecision *releasegate.Decision
 	if experiment.PolicyHash != "" {
 		if _, ok := s.store.(releasegate.Store); !ok {
@@ -326,6 +412,22 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 	// 8. Generate report
 	reportDir := filepath.Join(s.artifactsRoot, experimentID)
 	generator := report.NewGenerator(reportDir)
+	missingEvidence := append([]string(nil), incompleteReasons...)
+	reportDetails := report.ReportDetails{
+		Trigger:  &triggerResult,
+		Security: &securityResult,
+		Evidence: report.EvidenceSummary{
+			Complete:             len(missingEvidence) == 0 && identityValid && pairingValid,
+			IdentityValid:        identityValid,
+			PairingValid:         pairingValid,
+			TriggerEvaluated:     triggerResult.Evaluated,
+			SecurityEvaluated:    securityResult.Evaluated,
+			ReliabilityEvaluated: passAtK != nil,
+			IncompleteTrials:     missingTrialCount,
+			MissingEvidence:      missingEvidence,
+		},
+		Artifacts: makeEvidenceLinks(experimentID, trials),
+	}
 
 	// Generate report using the Generator API
 	reportData, err := generator.Generate(
@@ -337,6 +439,7 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		len(trialResults),
 		passAtK,
 		resourceUsage,
+		reportDetails,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to generate report: %w", err)
@@ -423,8 +526,8 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 				Lift: snapshotLift, CILower: snapshotCILower, CIUpper: snapshotCIUpper,
 				ValidCases: validCases, CIAvailable: ciAvailable, Trigger: triggerResult,
 				Security: securityResult, PairingValid: pairingValid, InvalidPairCount: invalidPairCount,
-				IdentityValid: true,
-				IncompleteTrials: incompleteTrialCount(trialResults, experiment.TotalTrials),
+				IdentityValid:    identityValid,
+				IncompleteTrials: missingTrialCount,
 				PassAt3: func() float64 {
 					if passAtK != nil {
 						return passAtK["pass@3"]
@@ -475,7 +578,14 @@ func (s *Service) ProcessExperiment(ctx context.Context, experimentID string) er
 		}
 	}
 
-	// 10. Transition experiment to COMPLETED
+	// 10. Do not claim completion when required grading/evidence is missing. The
+	// report and (when configured) HOLD decision are already durable, so a retry
+	// can resume from the same GRADING state without losing diagnostics.
+	if len(incompleteReasons) > 0 {
+		return fmt.Errorf("%w: %s", ErrIncompleteEvidence, strings.Join(incompleteReasons, "; "))
+	}
+
+	// 11. Transition experiment to COMPLETED
 	if err := s.store.TransitionExperimentStatus(ctx, experimentID, scheduler.ExperimentGrading, scheduler.ExperimentStatus("COMPLETED")); err != nil {
 		return fmt.Errorf("failed to transition experiment to COMPLETED: %w", err)
 	}
@@ -500,8 +610,11 @@ func securityFindingFromGrades(caseID string, raw json.RawMessage) metrics.Secur
 	for _, result := range manifest.Graders {
 		severity, _ := result.Evidence["severity"].(string)
 		status, _ := result.Evidence["status"].(string)
-		if severity != "" || status != "" {
-			return metrics.SecurityFinding{CaseID: caseID, Severity: severity, Status: status, Present: true}
+		if severity != "" && status != "" {
+			finding := metrics.SecurityFinding{CaseID: caseID, Severity: severity, Status: status, Present: true}
+			finding.EvidenceRef, _ = result.Evidence["evidence_ref"].(string)
+			finding.ScannerVersion, _ = result.Evidence["scanner_version"].(string)
+			return finding
 		}
 	}
 	return metrics.SecurityFinding{CaseID: caseID}
@@ -515,6 +628,74 @@ func incompleteTrialCount(trialResults []metrics.TrialResult, expected int) int 
 		return missing
 	}
 	return 0
+}
+
+func trialHasScoredGrades(raw json.RawMessage) bool {
+	if !hasActualGrades(raw) {
+		return false
+	}
+	var manifest grader.GradesManifest
+	if json.Unmarshal(raw, &manifest) != nil {
+		return false
+	}
+	return manifest.Status == "" || manifest.Status == "scored"
+}
+
+func validateGradesManifest(manifest grader.GradesManifest, expectedHash string) string {
+	if len(manifest.Graders) == 0 {
+		return "grades contains no grader results"
+	}
+	if manifest.Status != "" && manifest.Status != "scored" {
+		return "grades status=" + manifest.Status
+	}
+	if manifest.GraderHash != "" && expectedHash != "" && manifest.GraderHash != expectedHash {
+		return "grades grader_hash mismatch"
+	}
+	for _, result := range manifest.Graders {
+		if result.Status == "incomplete" || result.Status == "invalid" || result.Status == "failed" {
+			return "grader " + result.GraderID + " status=" + result.Status
+		}
+		if result.GraderHash != "" && expectedHash != "" && result.GraderHash != expectedHash {
+			return "grader " + result.GraderID + " hash mismatch"
+		}
+	}
+	return ""
+}
+
+func validateTrialIdentities(trials []TrialResult, expectedGraderHash string) bool {
+	if len(trials) == 0 {
+		return false
+	}
+	valid := true
+	for _, trial := range trials {
+		if trial.TrialID == "" || trial.LogicalTrialID == "" || trial.CaseID == "" || trial.Arm == "" || trial.ModelHash == "" || trial.EnvironmentHash == "" || trial.GraderHash == "" {
+			valid = false
+		}
+		if expectedGraderHash != "" && trial.GraderHash != expectedGraderHash {
+			valid = false
+		}
+	}
+	return valid
+}
+
+func makeEvidenceLinks(experimentID string, trials []TrialResult) []report.EvidenceLink {
+	links := make([]report.EvidenceLink, 0, len(trials))
+	for _, trial := range trials {
+		if trial.TrialID == "" {
+			continue
+		}
+		root := trial.ArtifactsDir
+		if root == "" {
+			root = filepath.Join("artifacts", experimentID, trial.TrialID)
+		}
+		links = append(links, report.EvidenceLink{
+			TrialID:      trial.TrialID,
+			CaseID:       trial.CaseID,
+			TraceRef:     "artifact://" + filepath.ToSlash(filepath.Join(root, "trace.json")),
+			ArtifactRefs: []string{"artifact://" + filepath.ToSlash(root)},
+		})
+	}
+	return links
 }
 
 func (s *Service) loadPolicy(hash string) *strategy.Policy {
@@ -535,8 +716,23 @@ func (s *Service) loadPolicy(hash string) *strategy.Policy {
 			continue
 		}
 		policy, diags := strategy.ParsePolicyYAML(raw)
-		if policy == nil || len(diags) > 0 || policy.Hash != hash {
+		if policy == nil || len(diags) > 0 {
 			continue
+		}
+		// Manifest compilation historically hashes the generic YAML document,
+		// while strategy.ParsePolicyYAML hashes its normalized representation.
+		// Accept both representations during the migration, but retain the
+		// immutable hash supplied by the experiment in the decision snapshot.
+		if policy.Hash != hash {
+			var generic any
+			if yaml.Unmarshal(raw, &generic) != nil {
+				continue
+			}
+			rawHash, hashErr := identity.HashCanonical(generic)
+			if hashErr != nil || rawHash != hash {
+				continue
+			}
+			policy.Hash = hash
 		}
 		return policy
 	}
@@ -578,6 +774,9 @@ func allGradersPassed(manifest grader.GradesManifest) bool {
 		return false
 	}
 	for _, g := range manifest.Graders {
+		if g.Status != "" && g.Status != "scored" {
+			return false
+		}
 		if !g.Passed {
 			return false
 		}
@@ -625,17 +824,25 @@ func computePassAtK(candidateScores []metrics.CaseScore) map[string]float64 {
 func computeResourceUsage(trials []TrialResult) *report.ResourceUsage {
 	var baselineTokens, candidateTokens []float64
 	var baselineLatency, candidateLatency []float64
+	var baselineTools, candidateTools []float64
+	var baselineCost, candidateCost []float64
 
 	for _, trial := range trials {
 		tokens := float64(trial.InputTokens + trial.OutputTokens)
 		latency := float64(trial.LatencyMS)
+		tools := float64(trial.ToolCalls)
+		cost := trial.CostUSD
 		switch trial.Arm {
 		case "without_skill":
 			baselineTokens = append(baselineTokens, tokens)
 			baselineLatency = append(baselineLatency, latency)
+			baselineTools = append(baselineTools, tools)
+			baselineCost = append(baselineCost, cost)
 		case "with_skill":
 			candidateTokens = append(candidateTokens, tokens)
 			candidateLatency = append(candidateLatency, latency)
+			candidateTools = append(candidateTools, tools)
+			candidateCost = append(candidateCost, cost)
 		}
 	}
 
@@ -644,7 +851,9 @@ func computeResourceUsage(trials []TrialResult) *report.ResourceUsage {
 	}
 
 	return &report.ResourceUsage{
-		TokenDelta:   *statistics.CalculateResourceDelta(baselineTokens, candidateTokens),
-		LatencyDelta: *statistics.CalculateResourceDelta(baselineLatency, candidateLatency),
+		TokenDelta:    *statistics.CalculateResourceDelta(baselineTokens, candidateTokens),
+		LatencyDelta:  *statistics.CalculateResourceDelta(baselineLatency, candidateLatency),
+		ToolCallDelta: *statistics.CalculateResourceDelta(baselineTools, candidateTools),
+		CostDelta:     *statistics.CalculateResourceDelta(baselineCost, candidateCost),
 	}
 }

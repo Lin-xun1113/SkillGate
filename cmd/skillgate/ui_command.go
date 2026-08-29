@@ -15,6 +15,10 @@ import (
 func uiCommand(args []string) int {
 	jsonOutput := contains(args, "--json")
 	listen := flagValue(args, "--listen", ":8080")
+	artifactsDir := flagValue(args, "--artifacts-dir", os.Getenv("SKILLGATE_ARTIFACTS_DIR"))
+	if artifactsDir == "" {
+		artifactsDir = "./artifacts"
+	}
 
 	dbURL, err := databaseURL(args)
 	if err != nil {
@@ -31,7 +35,7 @@ func uiCommand(args []string) int {
 	defer pgStore.Close()
 
 	// Create UI server
-	server := ui.NewServer(pgStore, listen)
+	server := ui.NewServerWithArtifacts(pgStore, listen, artifactsDir)
 
 	// Setup graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -45,9 +49,10 @@ func uiCommand(args []string) int {
 
 	if jsonOutput {
 		printSuccess(true, map[string]any{
-			"started":  true,
-			"listen":   listen,
-			"database": "connected",
+			"started":       true,
+			"listen":        listen,
+			"database":      "connected",
+			"artifacts_dir": artifactsDir,
 		})
 	} else {
 		fmt.Printf("Listening on %s\n", listen)

@@ -17,7 +17,7 @@ result_key       = sha256(canonical_json({trial_id, result_manifest_hash}))
 ## 2. CLI
 
 ```text
-skillgate db migrate|status [--database-url <url>] [--json]
+skillgate db migrate|status [--database-url-file <path>] [--json]
 skillgate experiment materialize <manifest> [--max-attempts <n>] [--trial-timeout <duration>] [--budget-timeout <duration>] [--json]
 skillgate experiment cancel --experiment-id <id> [--actor <id>] [--reason <text>] [--json]
 skillgate trial claim --worker-id <id> [--lease-duration <duration>] [--json]
@@ -27,7 +27,7 @@ skillgate trial complete --logical-trial-id <id> --trial-id <id> --worker-id <id
 skillgate scheduler sweep [--limit <n>] [--json]
 ```
 
-- `SKILLGATE_DATABASE_URL` 可替代 `--database-url`；Credential 不得写入仓库；
+- `SKILLGATE_DATABASE_URL_FILE`（推荐）或 `SKILLGATE_DATABASE_URL` 可替代数据库参数；`--database-url-file` 只传递 Secret 文件路径。旧 `--database-url` 仅允许无密码 URL，Credential 不得写入仓库；
 - Lease Token 只从 Claim 响应取得，并通过受保护文件传给后续 CLI；普通输出、日志和错误不得回显 Token；
 - `--json` 使用 `skillgate.cli.v1`，成功输出 `operation`、`data` 和 `diagnostics`；
 - 错误使用稳定 Code 与非零退出码，不泄露 SQL、DSN 或不可信 Payload。
@@ -64,7 +64,7 @@ Completion 在一个事务内锁定 Attempt、Logical Trial 和 Experiment，校
 go test ./...
 go test -race ./...
 go vet ./...
-TEST_DATABASE_URL='postgres://...?...' go test -count=1 ./internal/store/postgres
+TEST_DATABASE_URL="$(<"$SKILLGATE_DATABASE_URL_FILE")" go test -count=1 ./internal/store/postgres
 npm run validate:m0
 ```
 

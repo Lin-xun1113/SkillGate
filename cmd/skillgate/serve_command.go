@@ -7,11 +7,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/Lin-xun1113/SkillGate/internal/execution"
 	"github.com/Lin-xun1113/SkillGate/internal/grader"
 	"github.com/Lin-xun1113/SkillGate/internal/grading"
+	"github.com/Lin-xun1113/SkillGate/internal/manifest"
 	"github.com/Lin-xun1113/SkillGate/internal/runner"
 	"github.com/Lin-xun1113/SkillGate/internal/store/postgres"
 )
@@ -21,11 +24,32 @@ func serveCommand(args []string) int {
 	grpcAddr := flagValue(args, "--grpc-addr", ":50051")
 	artifactsDir := flagValue(args, "--artifacts-dir", "./artifacts")
 	gradersDir := flagValue(args, "--graders-dir", "./graders")
+	projectRoot := flagValue(args, "--project-root", os.Getenv("SKILLGATE_PROJECT_ROOT"))
+	var err error
+	if projectRoot == "" {
+		projectRoot, err = os.Getwd()
+		if err != nil {
+			return returnWithError(jsonOutput, "IO_ERROR", "project-root", fmt.Sprintf("failed to resolve project root: %v", err))
+		}
+	}
+	casDir := flagValue(args, "--cas-dir", os.Getenv("SKILLGATE_CAS_DIR"))
+	if casDir == "" {
+		casDir = filepath.Join(projectRoot, ".skillgate", "cas")
+	}
 	pollIntervalStr := flagValue(args, "--grading-poll-interval", "5s")
+	sweepIntervalStr := flagValue(args, "--sweep-interval", pollIntervalStr)
+	sweepLimit := intFlag(args, "--sweep-limit", 100)
 
 	pollInterval, err := time.ParseDuration(pollIntervalStr)
 	if err != nil {
 		return returnWithError(jsonOutput, "INVALID_ARGUMENT", "grading-poll-interval", fmt.Sprintf("invalid duration: %v", err))
+	}
+	sweepInterval, err := time.ParseDuration(sweepIntervalStr)
+	if err != nil || sweepInterval <= 0 {
+		return returnWithError(jsonOutput, "INVALID_ARGUMENT", "sweep-interval", fmt.Sprintf("invalid duration: %q", sweepIntervalStr))
+	}
+	if sweepLimit < 1 || sweepLimit > 1000 {
+		return returnWithError(jsonOutput, "INVALID_ARGUMENT", "sweep-limit", "sweep-limit 必须位于 1..1000")
 	}
 
 	dbURL, err := databaseURL(args)
@@ -51,8 +75,14 @@ func serveCommand(args []string) int {
 	// Initialize Grading Service
 	gradingService := grading.NewService(pgStore, graderRegistry, artifactsDir, pollInterval)
 
-	// Create runner server
-	server := runner.NewServer(pgStore, nil)
+	// Project execution content from the persisted manifest before handing a
+	// claim to a worker. This keeps the worker a thin protocol client.
+	compiler := manifest.NewCompiler(projectRoot, casDir)
+	projector := execution.NewProjector(compiler)
+	server := runner.NewServer(pgStore, &runner.ServiceOptions{
+		Projector:     projector,
+		ArtifactsRoot: artifactsDir,
+	})
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
@@ -68,6 +98,10 @@ func serveCommand(args []string) int {
 
 	// Start grading poller
 	go startGradingPoller(pollerCtx, gradingService, pgStore, pollInterval)
+	// Reconcile expired leases and budget-deadline work in the same long-lived
+	// control-plane process. This is independent from grading so a stalled
+	// grader cannot prevent scheduler recovery.
+	go startSchedulerSweeper(pollerCtx, pgStore, sweepInterval, sweepLimit)
 
 	serverErrChan := make(chan error, 1)
 	go func() {
@@ -76,17 +110,21 @@ func serveCommand(args []string) int {
 
 	if jsonOutput {
 		printSuccess(true, map[string]any{
-			"started":             true,
-			"grpc_addr":           lis.Addr().String(),
-			"database":            "connected",
-			"grading_poller":      "started",
-			"poll_interval":       pollInterval.String(),
-			"artifacts_dir":       artifactsDir,
-			"graders_dir":         gradersDir,
+			"started":        true,
+			"grpc_addr":      lis.Addr().String(),
+			"database":       "connected",
+			"grading_poller": "started",
+			"poll_interval":  pollInterval.String(),
+			"sweep_interval": sweepInterval.String(),
+			"sweep_limit":    sweepLimit,
+			"artifacts_dir":  artifactsDir,
+			"graders_dir":    gradersDir,
+			"project_root":   projectRoot,
+			"cas_dir":        casDir,
 		})
 	} else {
 		fmt.Printf("skillgate runner server listening on %s\n", lis.Addr().String())
-		fmt.Printf("grading poller started (interval: %v)\n", pollInterval)
+		fmt.Printf("grading poller started (interval: %v); scheduler sweeper started (interval: %v)\n", pollInterval, sweepInterval)
 	}
 
 	select {

@@ -2,6 +2,7 @@ package releasegate
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/Lin-xun1113/SkillGate/internal/metrics"
@@ -173,10 +174,10 @@ func TestDecisionRoundTripWithActorAndEvidence(t *testing.T) {
 	strategy.ResetCache()
 	policy := mustConservative(t)
 	snap := mustSnap(t, promoteSnapshotInput())
-	
+
 	// Create a decision with all fields
 	decision := Evaluate(policy, snap)
-	
+
 	// Verify Actor and EvidenceLinks are populated
 	if decision.Actor != "grading-service" {
 		t.Fatalf("expected actor=grading-service, got %s", decision.Actor)
@@ -184,7 +185,7 @@ func TestDecisionRoundTripWithActorAndEvidence(t *testing.T) {
 	if len(decision.EvidenceLinks) == 0 {
 		t.Fatal("expected evidence links to be populated")
 	}
-	
+
 	// Verify ToReportDecision preserves new fields
 	reportDecision := ToReportDecision(decision)
 	if reportDecision == nil {
@@ -195,5 +196,20 @@ func TestDecisionRoundTripWithActorAndEvidence(t *testing.T) {
 	}
 	if len(reportDecision.EvidenceLinks) != len(decision.EvidenceLinks) {
 		t.Fatalf("ToReportDecision lost evidence links: expected %d, got %d", len(decision.EvidenceLinks), len(reportDecision.EvidenceLinks))
+	}
+}
+
+func TestEvaluatePolicyHashMismatchFailsClosed(t *testing.T) {
+	strategy.ResetCache()
+	policy := mustConservative(t)
+	snapInput := promoteSnapshotInput()
+	snapInput.PolicyHash = "sha256:" + "0" + strings.Repeat("1", 63)
+	snap := mustSnap(t, snapInput)
+	decision := Evaluate(policy, snap)
+	if decision.Result != strategy.DecisionHold {
+		t.Fatalf("policy hash mismatch must HOLD, got %s", decision.Result)
+	}
+	if len(decision.FailedConditions) == 0 || decision.FailedConditions[0].Reason != "policy_hash_mismatch" {
+		t.Fatalf("missing policy hash mismatch trace: %+v", decision.FailedConditions)
 	}
 }

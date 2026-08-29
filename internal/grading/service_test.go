@@ -3,6 +3,7 @@ package grading
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -14,11 +15,11 @@ import (
 
 // Mock Store for testing
 type mockStore struct {
-	experiment   *Experiment
-	trials       []TrialResult
-	updatedGrades map[string]json.RawMessage
+	experiment        *Experiment
+	trials            []TrialResult
+	updatedGrades     map[string]json.RawMessage
 	statusTransitions []statusTransition
-	savedReports []ExperimentReport
+	savedReports      []ExperimentReport
 }
 
 type statusTransition struct {
@@ -296,17 +297,17 @@ func TestHasActualGrades(t *testing.T) {
 func TestEmptyGradesNotSkippedInProcessing(t *testing.T) {
 	// Verify that empty {} grades are treated as "not graded yet"
 	emptyGrades := []byte(`{}`)
-	
+
 	// This should return false so the trial is not skipped
 	if hasActualGrades(emptyGrades) {
 		t.Error("Empty {} should be treated as not graded yet")
 	}
-	
+
 	// Verify that after json.Marshal, {} still doesn't have graders
 	var manifest map[string]interface{}
 	json.Unmarshal(emptyGrades, &manifest)
 	marshaled, _ := json.Marshal(manifest)
-	
+
 	if hasActualGrades(marshaled) {
 		t.Error("Marshaled empty object should still be treated as not graded")
 	}
@@ -386,5 +387,38 @@ func TestProcessExperiment_PairingValidationEnforced(t *testing.T) {
 	// Lift should be 0 since there are no valid pairs
 	if report.MeanLift != nil && *report.MeanLift != 0 {
 		t.Errorf("expected mean_lift to be 0 or nil with no valid pairs, got %f", *report.MeanLift)
+	}
+}
+
+func TestProcessExperimentMissingGradesDoesNotComplete(t *testing.T) {
+	store := &mockStore{
+		experiment: &Experiment{ExperimentID: "exp-incomplete", GraderHash: "grader-missing", TotalTrials: 1},
+		trials: []TrialResult{{
+			ResultID: "result-1", TrialID: "trial-1", LogicalTrialID: "logical-1", CaseID: "case-1", Arm: "with_skill",
+			RepetitionIndex: 0, ModelHash: "model", EnvironmentHash: "env", GraderHash: "grader-missing",
+			Grades: json.RawMessage(`{}`),
+		}},
+	}
+	service := NewService(store, grader.NewRegistry(t.TempDir()), t.TempDir(), time.Second)
+	err := service.ProcessExperiment(context.Background(), "exp-incomplete")
+	if !errors.Is(err, ErrIncompleteEvidence) {
+		t.Fatalf("expected ErrIncompleteEvidence, got %v", err)
+	}
+	if len(store.statusTransitions) != 0 {
+		t.Fatalf("incomplete grading must not transition to COMPLETED: %+v", store.statusTransitions)
+	}
+	if len(store.savedReports) != 1 {
+		t.Fatalf("expected incomplete report to be persisted, got %d", len(store.savedReports))
+	}
+	reportData, readErr := os.ReadFile(store.savedReports[0].FilePath)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	var persisted report.Report
+	if err := json.Unmarshal(reportData, &persisted); err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Evidence.Complete {
+		t.Fatal("incomplete report must not claim complete evidence")
 	}
 }

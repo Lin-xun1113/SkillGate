@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 )
 
 // SandboxConfig holds configuration for a trial sandbox
@@ -50,13 +51,25 @@ func NewSandbox(cfg SandboxConfig) (*Sandbox, error) {
 
 // Create creates and starts the container
 func (s *Sandbox) Create(ctx context.Context) error {
-	// Pull image if needed
-	reader, err := s.cli.ImagePull(ctx, s.config.Image, image.PullOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to pull image: %w", err)
+	// Avoid an unconditional registry request for every trial. This keeps
+	// offline/local runs deterministic while retaining the convenience of
+	// pulling a missing image on first use.
+	if _, err := s.cli.ImageInspect(ctx, s.config.Image); err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to inspect image %q: %w", s.config.Image, err)
+		}
+		reader, pullErr := s.cli.ImagePull(ctx, s.config.Image, image.PullOptions{})
+		if pullErr != nil {
+			return fmt.Errorf("failed to pull image: %w", pullErr)
+		}
+		if _, copyErr := io.Copy(io.Discard, reader); copyErr != nil {
+			_ = reader.Close()
+			return fmt.Errorf("failed to read image pull response: %w", copyErr)
+		}
+		if closeErr := reader.Close(); closeErr != nil {
+			return fmt.Errorf("failed to close image pull response: %w", closeErr)
+		}
 	}
-	io.Copy(io.Discard, reader)
-	reader.Close()
 
 	// Configure mounts
 	mounts := []mount.Mount{
@@ -75,9 +88,9 @@ func (s *Sandbox) Create(ctx context.Context) error {
 
 	// Configure container resources and security
 	hostConfig := &container.HostConfig{
-		Mounts:          mounts,
-		NetworkMode:     container.NetworkMode("none"),
-		ReadonlyRootfs:  s.config.ReadOnlyRoot,
+		Mounts:         mounts,
+		NetworkMode:    container.NetworkMode("none"),
+		ReadonlyRootfs: s.config.ReadOnlyRoot,
 		Resources: container.Resources{
 			Memory:   s.config.MemoryLimitMB * 1024 * 1024,
 			CPUQuota: s.config.CPUQuota,
@@ -200,8 +213,9 @@ func RunTrial(ctx context.Context, config SandboxConfig) (exitCode int64, logs s
 	}
 	defer sandbox.Cleanup(ctx)
 
-	// Execute worker (placeholder - actual command depends on worker implementation)
-	code, err := sandbox.Exec(ctx, []string{"python", "-m", "langgraph_worker.worker"})
+	// The request is mounted at /artifacts and the worker's unified module
+	// supports a one-shot local mode for Go-managed sandboxes.
+	code, err := sandbox.Exec(ctx, []string{"python", "-m", "langgraph_worker", "--request", "/artifacts/request.json", "--cas", "/cas", "--artifacts", "/artifacts"})
 	if err != nil {
 		return int64(code), "", err
 	}

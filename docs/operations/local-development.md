@@ -1,6 +1,6 @@
 # 本地开发手册
 
-**状态：** `PROVISIONAL → M2`；2026-08-25（UTC）Build 候选，等待 Native Verify
+**状态：** `PROVISIONAL → P1`；2026-08-30（UTC）Secret Source 已接入，ArtifactStore/OTel 仍属后续阶段
 
 ## 1. M2 本地依赖
 
@@ -9,10 +9,11 @@ M2 当前只要求 PostgreSQL；MinIO、API、Worker 和 OTel 留给后续里程
 ```bash
 docker run --name skillgate-m2-postgres --rm -d \\
   -e POSTGRES_USER=skillgate \\
-  -e POSTGRES_PASSWORD=skillgate_test \\
+  -e POSTGRES_PASSWORD_FILE=/run/secrets/postgres-password \\
   -e POSTGRES_DB=skillgate_test \\
   -p 127.0.0.1:55432:5432 postgres:17-alpine
-export SKILLGATE_DATABASE_URL='postgres://skillgate:skillgate_test@127.0.0.1:55432/skillgate_test?sslmode=disable'
+# 将受保护文件设置为 postgres://<user>:<password>@127.0.0.1:55432/skillgate_test?sslmode=disable
+export SKILLGATE_DATABASE_URL_FILE=/run/operator/skillgate-database-url
 ```
 
 M2 必须使用真实 PostgreSQL；SQL Mock、SQLite 和内存 Store 不能作为并发/事务 Gate。M2 之外的 MVP 依赖仍希望通过 Docker Compose 启动：
@@ -30,8 +31,8 @@ Python LangGraph Worker
 ## 2. M2 推荐启动顺序
 
 1. 启动 PostgreSQL；
-2. 执行 `go run ./cmd/skillgate db migrate --json`；
-3. 使用 `go run ./cmd/skillgate experiment materialize experiments/csv-analysis-v1-demo.yaml --json` 物化 Synthetic Plan；
+2. 执行 `go run ./cmd/skillgate db migrate --database-url-file "$SKILLGATE_DATABASE_URL_FILE" --json`；
+3. 使用 `go run ./cmd/skillgate experiment materialize experiments/csv-analysis-v1-demo.yaml --database-url-file "$SKILLGATE_DATABASE_URL_FILE" --json` 物化 Synthetic Plan；
 4. 使用 `trial claim|start|heartbeat|complete` 演示生命周期；Token 通过受保护文件传递；
 5. 使用 `go run ./cmd/skillgate scheduler sweep --json` 演示过期回收；
 6. 使用 `go test -count=1 ./internal/store/postgres` 执行真实并发/故障测试；
@@ -50,7 +51,7 @@ Python LangGraph Worker
 
 ```text
 SKILLGATE_ENV=local
-SKILLGATE_DATABASE_URL=postgres://...
+SKILLGATE_DATABASE_URL_FILE=/run/operator/skillgate-database-url
 SKILLGATE_OBJECT_STORE_ENDPOINT=http://localhost:9000
 SKILLGATE_OBJECT_STORE_BUCKET=skillgate
 SKILLGATE_RUNNER_PROTOCOL_VERSION=runner.v1
@@ -67,7 +68,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 go test ./...
 go test -race ./...
 go vet ./...
-TEST_DATABASE_URL="$SKILLGATE_DATABASE_URL" go test -count=1 ./internal/store/postgres
+TEST_DATABASE_URL="$(<"$SKILLGATE_DATABASE_URL_FILE")" go test -count=1 ./internal/store/postgres
 npm run validate:m0
 go run ./cmd/skillgate --help
 ```

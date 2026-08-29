@@ -16,10 +16,15 @@ const (
 type GraderMethod string
 
 const (
+	MethodFileExists      GraderMethod = "file_exists"
 	MethodFileContent     GraderMethod = "file_content"
+	MethodFileHash        GraderMethod = "file_hash"
 	MethodJSONSchema      GraderMethod = "json_schema"
+	MethodJSONField       GraderMethod = "json_field"
+	MethodRegex           GraderMethod = "regex"
 	MethodCommandExitCode GraderMethod = "command_exit_code"
 	MethodTraceAssertion  GraderMethod = "trace_assertion"
+	MethodSuiteAssertions GraderMethod = "suite_assertions"
 	MethodLLMRubric       GraderMethod = "llm_rubric"
 )
 
@@ -60,17 +65,27 @@ type ScoringConfig struct {
 
 // GradeResult represents the result of grading a single trial
 type GradeResult struct {
-	GraderID   string                 `json:"grader_id"`
-	GraderType string                 `json:"grader_type"`
-	Passed     bool                   `json:"passed"`
-	Score      float64                `json:"score"`
-	Message    string                 `json:"message"`
-	Evidence   map[string]interface{} `json:"evidence"`
-	ExecutedAt time.Time              `json:"executed_at"`
+	GraderID      string                 `json:"grader_id"`
+	GraderHash    string                 `json:"grader_hash,omitempty"`
+	GraderVersion int                    `json:"grader_version,omitempty"`
+	GraderType    string                 `json:"grader_type"`
+	Status        string                 `json:"status"`
+	Passed        bool                   `json:"passed"`
+	Score         float64                `json:"score"`
+	Message       string                 `json:"message"`
+	Evidence      map[string]interface{} `json:"evidence"`
+	InputHash     string                 `json:"input_hash,omitempty"`
+	EvidenceHash  string                 `json:"evidence_hash,omitempty"`
+	ExecutedAt    time.Time              `json:"executed_at"`
 }
 
 // GradesManifest represents the complete grading result for a trial
 type GradesManifest struct {
 	Graders         []GradeResult `json:"graders"`
 	AggregatedScore float64       `json:"aggregated_score"`
+	Status          string        `json:"status,omitempty"`
+	GraderHash      string        `json:"grader_hash,omitempty"`
+	GraderVersion   int           `json:"grader_version,omitempty"`
+	InputHash       string        `json:"input_hash,omitempty"`
+	EvidenceHash    string        `json:"evidence_hash,omitempty"`
 }

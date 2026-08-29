@@ -4,6 +4,8 @@
 **Updated by:** Automated fix workflow  
 **Status:** P0 COMPLETE ✅ | P1 IN PROGRESS 🔄
 
+> 历史状态快照（2026-08-27）。当前 P1 结果以 [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md)、`docs/audits/M6-FIXES-SUMMARY.md` 和 `docs/implementation/consolidation-roadmap.md` 为准；许可证仍需项目所有者确认。
+
 ---
 
 ## P0 Fixes - COMPLETED ✅

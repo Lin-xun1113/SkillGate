@@ -9,29 +9,29 @@ import (
 
 // CaseMeta describes a suite case needed for trigger/security aggregation.
 type CaseMeta struct {
-	CaseID         string
-	EvaluationMode string
-	Population     string
-	Polarity       string
+	CaseID         string `json:"case_id"`
+	EvaluationMode string `json:"evaluation_mode"`
+	Population     string `json:"population"`
+	Polarity       string `json:"polarity,omitempty"`
 }
 
 // TriggerInput is one candidate-arm trial used for routing metrics.
 type TriggerInput struct {
-	CaseID          string
-	Arm             string
-	RepetitionIndex int
-	Passed          bool
-	GradesJSON      []byte
+	CaseID          string `json:"case_id"`
+	Arm             string `json:"arm"`
+	RepetitionIndex int    `json:"repetition_index"`
+	Passed          bool   `json:"passed"`
+	GradesJSON      []byte `json:"-"`
 }
 
 // TriggerResult is Suite-level recall/specificity.
 type TriggerResult struct {
-	Recall          float64
-	Specificity     float64
-	Evaluated       bool
-	PositiveCases   int
-	NegativeCases   int
-	IncompleteCases int
+	Recall          float64 `json:"recall"`
+	Specificity     float64 `json:"specificity"`
+	Evaluated       bool    `json:"evaluated"`
+	PositiveCases   int     `json:"positive_cases"`
+	NegativeCases   int     `json:"negative_cases"`
+	IncompleteCases int     `json:"incomplete_cases"`
 }
 
 // AggregateTrigger computes recall and specificity from autonomous_trigger cases.
@@ -107,60 +107,124 @@ func AggregateTrigger(cases []CaseMeta, trials []TriggerInput) TriggerResult {
 }
 
 func trialSkillLoaded(trial TriggerInput) bool {
-	if skillLoadedFromGrades(trial.GradesJSON) {
-		return true
-	}
-	return trial.Passed
+	loaded, observed, _ := skillDecisionFromGrades(trial.GradesJSON)
+	// Trigger metrics must be based on an explicit trace/suite assertion. A
+	// generic grade pass, an empty manifest, or malformed JSON is not evidence
+	// that discovery loaded the Skill.
+	return observed && loaded
 }
 
 func skillLoadedFromGrades(raw []byte) bool {
+	loaded, _, _ := skillDecisionFromGrades(raw)
+	return loaded
+}
+
+// skillDecisionFromGrades returns (loaded, observed, valid). Suite assertions
+// are nested under evidence.assertions, while older graders put the expression
+// directly in evidence or message; support both forms without treating a
+// generic passed grade as a positive trigger signal.
+func skillDecisionFromGrades(raw []byte) (bool, bool, bool) {
 	if len(raw) == 0 {
-		return false
+		return false, false, false
 	}
-	var manifest struct {
-		Graders []struct {
-			Passed   bool                   `json:"passed"`
-			Message  string                 `json:"message"`
-			Evidence map[string]interface{} `json:"evidence"`
-		} `json:"graders"`
-	}
+	var manifest map[string]interface{}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
-		return false
+		return false, false, false
 	}
-	for _, g := range manifest.Graders {
-		if !g.Passed {
+	graders, ok := manifest["graders"].([]interface{})
+	if !ok {
+		return false, false, true
+	}
+	for _, rawGrader := range graders {
+		grader, ok := rawGrader.(map[string]interface{})
+		if !ok {
 			continue
 		}
-		blob := strings.ToLower(g.Message)
-		if strings.Contains(blob, "skill_loaded") || strings.Contains(blob, "skill loaded") {
-			return true
-		}
-		if ev, ok := g.Evidence["assertion"].(string); ok && strings.Contains(strings.ToLower(ev), "skill_loaded") {
-			return true
-		}
-		if ev, ok := g.Evidence["type"].(string); ok && ev == "skill_loaded" {
-			return true
+		passed, hasPassed := grader["passed"].(bool)
+		if loaded, observed, found := findSkillDecision(grader, passed, hasPassed); found {
+			return loaded, observed, true
 		}
 	}
-	return false
+	return false, false, true
+}
+
+// findSkillDecision recursively walks a grader and its evidence/assertions.
+// Only decision-bearing fields are inspected, so arbitrary model output in
+// evidence cannot become a routing signal merely by mentioning a Skill.
+func findSkillDecision(value interface{}, inheritedPassed, inheritedKnown bool) (bool, bool, bool) {
+	switch node := value.(type) {
+	case map[string]interface{}:
+		passed, known := inheritedPassed, inheritedKnown
+		if ownPassed, ok := node["passed"].(bool); ok {
+			passed, known = ownPassed, true
+		}
+		for _, key := range []string{"message", "assertion", "id", "type"} {
+			text, ok := node[key].(string)
+			if !ok {
+				continue
+			}
+			loaded, observed := skillDecisionText(text)
+			if !observed {
+				continue
+			}
+			// A failed or incomplete assertion is not positive evidence of a
+			// loaded Skill. This preserves the conservative routing metric.
+			return loaded && known && passed, true, true
+		}
+		for key, child := range node {
+			if key == "passed" || key == "message" || key == "assertion" || key == "id" || key == "type" {
+				continue
+			}
+			if loaded, observed, found := findSkillDecision(child, passed, known); found {
+				return loaded, observed, true
+			}
+		}
+	case []interface{}:
+		for _, child := range node {
+			if loaded, observed, found := findSkillDecision(child, inheritedPassed, inheritedKnown); found {
+				return loaded, observed, true
+			}
+		}
+	}
+	return false, false, false
+}
+
+func skillDecisionText(value string) (bool, bool) {
+	lower := strings.ToLower(strings.TrimSpace(value))
+	// Assertion IDs in older manifests use hyphens (for example,
+	// `skill-not-loaded`); normalize those separators while preserving the
+	// colon-delimited Skill name.
+	normalized := strings.ReplaceAll(lower, "-", "_")
+	if strings.HasPrefix(normalized, "skill_loaded:") || normalized == "skill_loaded" || strings.Contains(lower, "skill loaded") {
+		return true, true
+	}
+	if strings.HasPrefix(normalized, "skill_not_loaded:") || normalized == "skill_not_loaded" || strings.Contains(lower, "skill not loaded") {
+		return false, true
+	}
+	return false, false
 }
 
 // SecurityFinding is a parsed probe finding.
 type SecurityFinding struct {
-	CaseID   string
-	Severity string
-	Status   string
-	Present  bool
+	CaseID         string   `json:"case_id"`
+	Severity       string   `json:"severity"`
+	Status         string   `json:"status"`
+	Categories     []string `json:"categories,omitempty"`
+	EvidenceRef    string   `json:"evidence_ref,omitempty"`
+	ScannerVersion string   `json:"scanner_version,omitempty"`
+	RuntimeStatus  string   `json:"runtime_status,omitempty"`
+	Present        bool     `json:"present"`
 }
 
 // SecurityResult is Suite-level security counts.
 type SecurityResult struct {
-	Critical          int
-	High              int
-	ConfirmedExploits int
-	Evaluated         bool
-	MissingEvidence   int
-	ProbeCases        int
+	Critical          int               `json:"critical"`
+	High              int               `json:"high"`
+	ConfirmedExploits int               `json:"confirmed_exploits"`
+	Evaluated         bool              `json:"evaluated"`
+	MissingEvidence   int               `json:"missing_evidence"`
+	ProbeCases        int               `json:"probe_cases"`
+	Findings          []SecurityFinding `json:"findings,omitempty"`
 }
 
 // AggregateSecurity counts findings from security_probe cases.
@@ -169,7 +233,7 @@ func AggregateSecurity(cases []CaseMeta, findings []SecurityFinding) SecurityRes
 	for _, f := range findings {
 		byCase[f.CaseID] = f
 	}
-	out := SecurityResult{Evaluated: true}
+	out := SecurityResult{Evaluated: true, Findings: []SecurityFinding{}}
 	for _, meta := range cases {
 		if meta.EvaluationMode != "security_probe" {
 			continue
@@ -181,6 +245,7 @@ func AggregateSecurity(cases []CaseMeta, findings []SecurityFinding) SecurityRes
 			out.Evaluated = false
 			continue
 		}
+		out.Findings = append(out.Findings, f)
 		switch strings.ToLower(f.Severity) {
 		case "critical":
 			out.Critical++
@@ -208,22 +273,38 @@ func LoadSecurityFinding(path string) (SecurityFinding, error) {
 		return SecurityFinding{}, err
 	}
 	var doc struct {
-		CaseID   string `json:"case_id"`
-		Severity string `json:"severity"`
-		Status   string `json:"status"`
+		SchemaVersion  string   `json:"schema_version"`
+		CaseID         string   `json:"case_id"`
+		Severity       string   `json:"severity"`
+		Status         string   `json:"status"`
+		Categories     []string `json:"categories"`
+		EvidenceRef    string   `json:"evidence_ref"`
+		ScannerVersion string   `json:"scanner_version"`
+		RuntimeStatus  string   `json:"runtime_status"`
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return SecurityFinding{}, err
 	}
+	// A syntactically valid but empty object is not scanner evidence. Require the
+	// fields that make a finding auditable; callers must treat this as missing
+	// evidence and hold release decisions rather than counting a zero finding.
+	present := strings.TrimSpace(doc.Severity) != "" && strings.TrimSpace(doc.Status) != ""
 	return SecurityFinding{
-		CaseID:   doc.CaseID,
-		Severity: doc.Severity,
-		Status:   doc.Status,
-		Present:  true,
+		CaseID:         doc.CaseID,
+		Severity:       doc.Severity,
+		Status:         doc.Status,
+		Categories:     append([]string(nil), doc.Categories...),
+		EvidenceRef:    doc.EvidenceRef,
+		ScannerVersion: doc.ScannerVersion,
+		RuntimeStatus:  doc.RuntimeStatus,
+		Present:        present,
 	}, nil
 }
 
 // FindingPath returns the conventional finding artifact path.
 func FindingPath(artifactsRoot, experimentID, trialID string) string {
-	return filepath.Join(artifactsRoot, experimentID, trialID, "security-finding.json")
+	// Suite-declared outputs are rooted under each trial's `output/` directory.
+	// Keep security evidence lookup aligned with the immutable EvalSuite contract
+	// instead of silently treating a valid output/security-finding.json as absent.
+	return filepath.Join(artifactsRoot, experimentID, trialID, "output", "security-finding.json")
 }

@@ -6,6 +6,8 @@
 - `event-schema.md` —— **`FUTURE → M3`** Event Envelope、Event Type、Sequence 和脱敏
 - `release-gate-policy.md` —— **`FUTURE → M6`** PROMOTE/HOLD/REJECT 和 Security Hard Gate
 - `scheduler-reliability-contract.md` —— **`PROVISIONAL → M2`** PostgreSQL Queue/Lease/Retry/幂等 Commit 与 CLI Contract
+- `provider-runtime.md` —— **`PROVISIONAL`** OpenAI/Anthropic Adapter、Operator Secret/Endpoint、响应归一化与错误分类
+- `secret-source.md` —— **`IMPLEMENTED`** `NAME`/`NAME_FILE` Secret Source、稳定错误、CLI 与 Compose 凭据边界
 - `api-contract.md` —— **`FUTURE → M2+`** REST/JSON 资源、Endpoint、错误和并发控制
 
 这些文档是实现时的规范性依据。代码行为改变 Contract 前，必须先更新 ADR 和对应文档。

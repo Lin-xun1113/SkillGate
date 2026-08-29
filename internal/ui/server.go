@@ -15,21 +15,41 @@ import (
 
 // Server is the HTTP server for the Web UI
 type Server struct {
-	store  *postgres.Store
-	server *http.Server
-	mux    *http.ServeMux
+	store         *postgres.Store
+	server        *http.Server
+	mux           *http.ServeMux
+	artifactsRoot string
 }
 
 // NewServer creates a new UI server
 func NewServer(store *postgres.Store, listen string) *Server {
+	return NewServerWithArtifacts(store, listen, "")
+}
+
+// NewServerWithArtifacts creates the UI and read-only API server. The
+// artifacts root is used only for validating local artifact download paths.
+func NewServerWithArtifacts(store *postgres.Store, listen, artifactsRoot string) *Server {
 	s := &Server{
-		store: store,
-		mux:   http.NewServeMux(),
+		store:         store,
+		mux:           http.NewServeMux(),
+		artifactsRoot: artifactsRoot,
 	}
 
 	// Register routes
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/experiments/{id}", s.handleExperimentDetail)
+	// The API is intentionally read-only in this milestone. Mutations remain
+	// behind the validated CLI/scheduler boundary until auth and idempotency
+	// persistence are available for public API callers.
+	s.mux.HandleFunc("/api/v1/experiments/{id}", s.handleAPIExperiment)
+	s.mux.HandleFunc("/api/v1/experiments/{id}/trials", s.handleAPIExperimentTrials)
+	s.mux.HandleFunc("/api/v1/experiments/{id}/metrics", s.handleAPIMetrics)
+	s.mux.HandleFunc("/api/v1/experiments/{id}/decision", s.handleAPIDecision)
+	s.mux.HandleFunc("/api/v1/trials/{id}", s.handleAPITrial)
+	s.mux.HandleFunc("/api/v1/trials/{id}/events", s.handleAPITrialEvents)
+	s.mux.HandleFunc("/api/v1/trials/{id}/artifacts", s.handleAPITrialArtifacts)
+	s.mux.HandleFunc("/api/v1/artifacts/{id}/download-url", s.handleAPIArtifactDownloadURL)
+	s.mux.HandleFunc("/api/v1/artifacts/{id}/content", s.handleAPIArtifactContent)
 
 	s.server = &http.Server{
 		Addr:    listen,

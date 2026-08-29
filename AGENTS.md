@@ -2,7 +2,9 @@
 
 ## 项目当前状态
 
-SkillGate 当前处于**文档、研究与架构设计阶段**。仓库暂时没有应用实现代码。在项目计划、契约和第一个里程碑通过确认前，不要开始大范围编写代码。
+SkillGate 的 M0–M7 里程碑已全部实现并通过独立 Verify 归档（见 `docs/comet/archive/`）：内容寻址 Registry、Experiment Compiler、PostgreSQL Scheduler、gRPC Runner Protocol、Docker Sandbox + LangGraph Worker、Grading Pipeline、Metric 聚合与 Report、CEL Release Gate 以及 Web UI。当前处于**收尾与巩固阶段**：文档与代码的同步维护、遗留限制的跟进（S3 Artifact Store 未接入、OTel 遥测未接入主流程），以及下一步方向的确认。
+
+在开始新的改动前，请先阅读 `PROJECT_STATUS.md` 了解最新状态；仍然有效的协作约定：修改契约的实现必须同步更新对应 Contract 文档与 ADR。
 
 ## 产品方向
 
@@ -27,6 +29,7 @@ SkillGate 是一个 **Go-first 的 Agent Strategy 评估与晋级平台**。它�
 8. Security Finding 是硬门禁；Utility 不能抵消 Critical Security Issue。
 9. 避免过早引入分布式系统复杂度。先使用模块化 Go 服务和 PostgreSQL 队列，只有在实测需要后再引入 Broker。
 10. 如果实现改变了契约，必须同步更新相关文档并新增或更新 ADR。
+11. 状态描述必须可验证：不要声称未运行的验证（如真实 LLM 端到端、浏览器 UI 验证）已经完成，并在文档中保留对已知限制的诚实记录。
 
 ## 新贡献者或 Agent 的推荐阅读顺序
 
@@ -38,6 +41,8 @@ SkillGate 是一个 **Go-first 的 Agent Strategy 评估与晋级平台**。它�
 6. `docs/contracts/experiment-manifest.md`
 7. `docs/research/skill-evaluation-survey.md`
 8. `docs/implementation/implementation-plan.md`
+
+各里程碑实际交付内容的简明索引见 `docs/comet/archive/`（M0–M7 各自的 brief 与 verification），变更历史见 `docs/CHANGELOG.md`。
 
 ## 文档规则
 

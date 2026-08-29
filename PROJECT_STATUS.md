@@ -1,122 +1,139 @@
 # SkillGate 项目状态
 
-**最后更新：** 2026-08-25（UTC）  
-**阶段：** M0、M1、M2 已完成并归档；M3 Runner Protocol 与 Fixture Worker 已完成当前 Build 候选，正在等待 Native Verify，尚未归档。
-**实现状态：** Go Module、Canonical Identity、文件系统 CAS、Manifest Compiler、CLI、M2 PostgreSQL Queue/Lease/Retry/幂等 Commit，以及 M3 gRPC/Protobuf、Session/Capability、Request Hash、Heartbeat、PostgreSQL Event、幂等 Result、Python Fixture Worker 和 Compose Bootstrap 已建立。M3 的真实 PostgreSQL、Python 和 Compose 检查已通过；独立 Verify 结论仍以 Comet Runtime 为准。
+**最后更新：** 2026-08-30（UTC）
+**阶段：** M0–M7 全部完成并通过独立 Verify 归档，进入收尾与巩固阶段。
+**实现状态：** 内容寻址 Registry、Canonical Identity、Experiment Manifest Compiler、PostgreSQL Queue/Lease/Retry/幂等 Commit、gRPC Runner Protocol、Execution 投影、Docker Sandbox、Python LangGraph/Fixture Worker、Grading Pipeline、Metric 聚合与 Report、CEL Release Gate、Web UI 与 Docker Compose 一键部署均已建立。
 
-### M1 暂停原因与修复
+各里程碑的独立 Verify 结论以 `docs/comet/archive/<日期>-<里程碑>/verification.md` 为准。
 
-M1 在 Native Verify 阶段经历了 5 轮 Build/Verify 循环，产生了 83 个验收项（A1–A83），消耗了大量 Token 和时间。根因分析如下：
+## 最近一次本地验证（2026-08-27 UTC）
 
-1. **验收来源建模过细**：Comet Runtime 的 `Bo()` 函数将 spec.md 中的所有段落、列表项和表格行都提取为独立 A 项，导致 9 个 brief 高层验收膨胀为 84 项；
-2. **执行编排失误**：Builder 采用了逐条 patch 而非批量归类的修复方式，导致多轮不必要的 Verifier 循环；
-3. **Native 是放大器，不是根因**：Native 工作流忠实地执行了 83 项验收。问题在于验收集合本身过大。
+以下命令均在当前工作区实际运行通过：
 
-已采取的修正措施：
+```bash
+go build ./...          # 通过
+go vet ./...            # 通过
+go test -short ./...    # 全部包通过（不含需要外部 PostgreSQL/Docker 的长测试）
 
-- 项目级 Runtime Patch（`tools/comet-native-patch/`）移除了 spec 文本自动提取为 A 项的逻辑；2026-08-25（UTC）修正了 Patch 目标——实际执行路径是 `comet-native-next/archive/spec/doctor.mjs`（fast-runtime-router 路由），而非 `comet-native-runtime.mjs`；修复后 A 项只从 brief.md 提取；
-- Shape 阶段增加了验收项收敛步骤，限制 A 项在 8–12 项；
-- 文档已明确区分验收项（brief.md）和规格说明（spec.md）。
+go run ./cmd/skillgate compile experiments/csv-analysis-v1-demo.yaml
+# compiled=true pairs=24 trials=48 manifest_hash=sha256:248b0c6d…aac256d
 
-下一轮进入 Build 前，先验收收敛到 A1–A9（仅来自 brief.md）。当前已完成该收敛并经用户确认。
+go run ./cmd/skillgate skill validate skills/csv-analysis
+# valid=true hash=sha256:617fae44…9a9a1d
+```
+
+## 收尾修复验证（2026-08-28 UTC）
+
+本轮修复补齐了执行投影单测、共享 CAS/Grader 物化、LangGraph Worker gRPC 边界、只读 API 与租约过期回收。已在本地实际通过 `go test ./...`、`go vet ./...`、`go build ./...`、Manifest/CAS CLI 检查、Python Worker 测试和源码编译检查。2026-08-28 UTC 已完成一次干净 Docker Compose 验收：
+
+- `postgres` 健康，bootstrap 完成迁移、CAS prepare 和 48 个 Trial materialize；
+- 默认 `langgraph-worker` 完成 48/48 `SUCCEEDED`，48/48 Grader 结果为 `scored`；
+- Report 生成 4 个有效 Pair，Trigger Recall/Specificity 均为 `1.0`，Security `missing_evidence=0`；
+- Release Decision 为 `HOLD`（`utility.ci_lower=0`，Baseline/Candidate 在离线 Fixture 上得分相同），属于保守策略的预期结果，不是启动或证据缺失错误。
+
+验收命令为 `docker compose -f deploy/docker-compose.yml down -v --remove-orphans` 后执行 `docker compose -f deploy/docker-compose.yml up -d --build`，并通过 PostgreSQL 查询和 `/app/artifacts/<experiment_id>/report.json` 核对结果。该验收仍然是 Fixture Provider，不代表真实 Provider API E2E 已通过。
+
+## Provider 接口加固（2026-08-30 UTC）
+
+已完成 OpenAI/Anthropic Adapter 的离线契约加固：统一 `invoke` 接口，冻结 `model.config` 四字段 allowlist（temperature `0..2`、max_tokens `1..1000000`、timeout_seconds `(0,600]`、max_retries `0..30`），保留 `complete` 兼容入口和受限 legacy aliases；Manifest Compiler 与 Worker 双重拒绝未知字段、错误类型、越界值以及由实验内容注入的 Base URL、Endpoint、Credential 或 Header。响应统一归一化文本、Tool Call、实际 Model 与 Token Usage，并将 Provider 429/5xx/timeout/鉴权/参数错误映射为稳定 Runner Failure Category；Provider 错误链、Trace、Event、Result Manifest 和 `FailTrial` 在持久化前脱敏。归一化 Usage 随 `CompleteTrial` 写入结果证据。
+
+本轮实际通过 Python Worker `75 passed, 2 skipped`（包括 Injected OpenAI/Anthropic Contract Test）；两个跳过项分别是必须显式设置 `LIVE_PROVIDER_SMOKE=1` 的真实 Adapter Smoke 与 `LIVE_PROVIDER_FULL_CHAIN=1` 的 full-chain preflight marker。`./scripts/provider-live-smoke.sh` 默认输出 `SKIP`，显式开启但无 Credential 时 Fail Closed，并固定 1 Case、64 output token、30 秒、`0.05 USD` 上限。由于当前没有受控 Credential，未调用真实 OpenAI/Anthropic API，也未完成真实 Provider 的 gRPC → Grading → Report → Decision E2E；默认 48-trial Compose 仍为 Fixture Provider。契约见 `docs/contracts/provider-runtime.md`，剩余路线见 `docs/implementation/consolidation-roadmap.md`。
+
+## 2026-08-30 复核
+
+Provider 安全字段双重拒绝、Usage 上报和 Sandbox 本地镜像检查已补齐。当前实际通过 `go test ./...`、`go vet ./...`、`go build ./...`、两套 Python 环境的 `53 passed, 1 skipped`、`py_compile`、`docker compose config -q`、`npm run validate:m0` 与 `git diff --check`。重建后的 Compose 服务保持健康，UI API 仍返回 `COMPLETED`、48/48 Trial、4 个有效 Pair、Decision `HOLD`；Worker 无重启或 Provider/认证错误日志。
+
+## P1 Secret 与许可证边界（2026-08-30 UTC）
+
+已实现并补充测试：Go `internal/secrets` 与 Python Worker `secret_source.py` 统一按 `NAME_FILE` → `NAME` 读取，缺失/空值/不可读/非法名称分别返回稳定 `SECRET_*` 错误；Provider Key、数据库 URL 和密码不进入 Manifest、`execution_hash`、命令参数、日志、Trace、DB 或 Artifact。CLI 新增 `--database-url-file`，含密码的旧 `--database-url` 会 Fail Closed。
+
+Compose 默认形态明确为 Local Insecure Demo（仅合成 Secret + Fixture）；`deploy/docker-compose.production.yml` 是要求外部 Secret 文件的 Production override。`scripts/verify-secrets.sh` 提供合成 Sentinel 的 Git、CLI、输出树、Docker build-context 和轮换检查；`scripts/check-licenses.sh` 提供依赖许可证检查入口。
+
+项目所有者已确认 MIT 许可证，版权主体为 `Lin-xun1113`，许可证文本见根目录 `LICENSE`。个人项目暂不接入 CI；Secret/许可证检查脚本保留为手动验证入口。
+
+## 里程碑总览
+
+| 里程碑 | 内容 | 归档 |
+|---|---|---|
+| M0 | CSV/Data Analysis 评估基线：Skill、Eval Suite、配对 Manifest、Fixture、防泄漏审查与 Hash 锁定 | `docs/comet/archive/2026-08-19-m0-evaluation-baseline/` |
+| M1 | Go Module、`internal/identity`/`registry`/`manifest`/`validation`/`experiment`、内容寻址 Registry 与 Manifest Compiler、CLI | `docs/comet/archive/2026-08-25-m1-registry-manifest-compiler/` |
+| M2 | PostgreSQL Scheduler 可靠性核心：Lease/Fence、Heartbeat、有界 Retry、幂等 Result Commit、两阶段取消、CLI | `docs/comet/archive/2026-08-25-m2/` |
+| M3 | gRPC Runner Protocol（Go/Python 双端生成）、Session/Capability、Request Hash、事件流、幂等提交、Python Fixture Worker、Compose Bootstrap | `docs/comet/archive/2026-08-25-m3-runner-protocol/` |
+| M4 | Execution 投影（execution_hash）、Docker Sandbox（网络隔离/只读根/非 root/资源限制）、LangGraph Worker、Trace 与 Artifact | `docs/comet/archive/2026-08-26-m4/` |
+| M5 | Grading Pipeline（Deterministic 优先 + LLM Rubric）、Case-level Metric、Bootstrap CI、pass@k、JSON/Markdown/HTML Report | `docs/comet/archive/2026-08-26-m5/` |
+| M6 | CEL Release Gate：Policy 编译缓存、优先级规则评估、Trigger Recall/Specificity 聚合、Security 硬门禁、Fail Closed | `docs/comet/archive/2026-08-26-m6/` |
+| M7 | Web UI：实验列表页、报告详情页、Release Decision 展示、dark theme 响应式布局、优雅关闭 | `docs/comet/archive/2026-08-27-m7-web-ui/` |
+
+M5/M6 之后按 `docs/audits/` 中的审计完成了 P0/P1 缺陷修复（Grading Poller 集成、空 Grades 短路、Grader Hash 统一、Artifact 路径穿越防护、ValidatePairing 强制、Decision 字段补全等），详见 `docs/audits/M6-FIXES-SUMMARY.md`。
+
+## 部署形态
+
+- `deploy/docker-compose.yml`：postgres → bootstrap（迁移与编译）→ control-plane（gRPC `serve`）→ langgraph-worker（默认消费 48 个 Trial；`fixture-worker` 仅保留为可选 profile）→ ui（`:8080`）。
+- `deploy/run-demo.sh`：本地 Compose 之外的一键演示脚本。
+- `skillgate ui` 可独立启动 HTTP Server，通过 PostgreSQL 只读展示实验列表、报告与 Decision。
+
+## 当前已知限制
+
+以下事项为诚实记录，不代表已经或将要默认解决：
+
+1. **不声称 Exactly-once Execution。** 执行语义始终是“至少一次执行 + 幂等提交”；这是设计立场而非缺陷。
+2. **Artifact Storage 使用本地文件系统/Compose 卷。** MinIO/S3 兼容对象存储在架构文档中规划，尚未接入。
+3. **OpenTelemetry SDK 在依赖中，但主流程尚未接入遥测导出。** 架构文档中的可观测性目标属于后续工作。
+4. **真实 LLM Provider 未做端到端验收。** OpenAI/Anthropic Adapter 已完成离线 Contract Test 与显式 Live Smoke 入口，但全部已执行验证仍基于 Fixture/Fake Client，未消耗真实 Model Credential。
+5. **Web UI 存在 Builder 声明的已知限制：** 无端到端集成测试、模板渲染未单元测试、响应式布局未经浏览器实际验证（见 M7 verification）。
+6. **里程碑中途的文档描述可能与最终 Verify 结论不一致。** 例如旧版根 README 在 M4 中途将 A4（mock Provider 流程）与 A6（取消中断）标记为部分实现/待实现，而 M4 最终 verification.md 的结论是全部 8 项验收通过；两处冲突时以各里程碑 `verification.md` 为准。
+7. **Go-managed Sandbox 的执行日志仍是占位信息。** `RunTrial` 当前返回固定完成文本；真实 stdout/stderr 捕获、大小限制和脱敏纳入后续完整 Event/诊断阶段。
+8. **个人项目暂不接入 CI。** Secret Scan 与依赖许可证检查通过本地脚本手动运行；工具未安装时只能记录 `SKIP`，不能把它描述为已完成扫描。
 
 ## 已确认方向
 
-项目将采用**混合型 Go-first Agent Strategy Evaluation Platform**：
+项目采用**混合型 Go-first Agent Strategy Evaluation Platform**：
 
-- Go 是主要工程载体，负责 Control Plane。
-- Python + LangGraph 是可替换的单 Trial 执行 Worker。
-- 初始持久化事实来源是 PostgreSQL。
-- 大型 Trace 和文件使用 S3-compatible Object Storage（本地使用 MinIO）。
-- CEL-Go 暂作为 Policy Expression Engine。
-- Docker/rootless Sandbox 是初始隔离目标。
+- Go 是主要工程载体，负责 Control Plane（API 边界、实验编译、调度、Lease、幂等提交、Metric 聚合、Release Gate、UI）。
+- Python + LangGraph 是单 Trial 执行 Worker，通过语言无关的 gRPC 协议接入。
+- PostgreSQL 是实验元数据和生命周期状态的事实来源；大型 Artifact 规划走 S3-compatible Object Storage。
+- CEL-Go 作为 Policy Expression Engine；Docker Sandbox 是初始隔离手段。
 
-## 选择这个方向的原因
-
-目标岗位是 Binance 的 Accelerator Program —— Golang Engineer（Strategy Engine）。岗位重点包括 Go Backend Service、Rule Engine、可扩展且高效的方案、数据处理、测试和 AI 相关工作。纯 Python Skill Evaluator 能体现 AI 熟悉度，但对 Go 和 Rule Engine 的核心要求支持不足。混合架构让 Go 系统成为主体，同时保留可信的 Agent 项目内容。
+选择该方向的背景与理由：目标是 Binance Accelerator Program —— Golang Engineer（Strategy Engine）岗位的作品集项目，混合架构让 Go Backend、Rule/Strategy Engine、可靠异步任务处理成为系统主体，同时保留可信的 Agent 评估方法论内容。
 
 ## 已作出的决策
 
 | ID | 决策 | 状态 |
 |---|---|---|
-| ADR-001 | Go Control Plane + Python LangGraph Trial Worker | MVP 已接受 |
-| ADR-002 | 在引入 Message Broker 前，先使用 PostgreSQL Queue/Lease | MVP 已接受 |
+| ADR-001 | Go Control Plane + Python LangGraph Trial Worker | 已接受 |
+| ADR-002 | 引入 Message Broker 前，先使用 PostgreSQL Queue/Lease | 已接受 |
 | ADR-003 | 配对 Baseline/Candidate Evaluation 是强制要求 | 已接受 |
 | ADR-004 | Deterministic Grading 优先于 LLM Judging | 已接受 |
 | ADR-005 | Sandbox 和 Security 是独立的硬门禁 | 已接受 |
 | ADR-006 | Forced Injection 与 Autonomous Trigger 是不同的评估总体 | 已接受 |
 | ADR-007 | M0 首个 Workload 采用 CSV/Data Analysis 离线纵向切片 | 已接受 |
-| ADR-009 | M2 PostgreSQL Queue/Lease、严格 Fence、Retry 和幂等 Commit | M2 Shape 已接受，Verify 待完成 |
+| ADR-008 | M1 Registry 与 Manifest Compiler 设计（Environment Identity、Skill Package、Declared Hash） | 已接受 |
+| ADR-009 | M2 PostgreSQL Queue/Lease、严格 Fence、Retry 和幂等 Commit | 已接受 |
+| ADR-010 | M3 Runner Protocol 的租约校验与证据持久化 | 已接受 |
+| ADR-011 | Provider Runtime 的 Endpoint、Credential 与 Retry 安全边界 | 已接受 |
+| ADR-012 | Secret Source 与 Compose 凭据边界 | 已接受 |
 
 具体理由见 [`docs/decisions/`](docs/decisions/)。
 
-## M0 结果
+## 过程记录：M1 暂停原因与修复（保留备查）
 
-**结果：** M0 已完成并归档。Native 独立 Verifier 对 A1–A89 逐项判定为 `passed`；`npm run validate:m0`、两个 M0 脚本语法检查和 Hash 校验均通过。归档目录：`docs/comet/archive/2026-08-19-m0-evaluation-baseline/`。
+M1 在 Native Verify 阶段经历了 5 轮 Build/Verify 循环，产生了 83 个验收项（A1–A83）。根因是验收来源建模过细（spec 文本被逐段提取为独立 A 项）与逐条 patch 的编排失误；Native 工作流本身是忠实执行者，不是根因。修正措施：
 
-已生成并冻结待验收的 CSV/Data Analysis 样例：
+- 项目级 Runtime Patch（`tools/comet-native-patch/`）移除了 spec 文本自动提取为 A 项的逻辑；
+- Shape 阶段增加验收项收敛步骤，A 项限制在 8–12 项且仅来自 brief.md；
+- 文档明确区分验收项（brief.md）与规格说明（spec.md）。
 
-- `skills/csv-analysis/SKILL.md`：不包含 Task-specific Answer 的通用 Skill；
-- `evals/csv-analysis/suite.yaml`：4 个 Forced Injection Answer、3 个 Autonomous Trigger、1 个 Security Probe；
-- `experiments/csv-analysis-v1-demo.yaml`：`without_skill`/`with_skill` 配对、3 次 Repetition、Fixture Provider；
-- `evals/csv-analysis/LEAKAGE_REVIEW.md`：逐 Case Builder 手工审查；
-- `evals/csv-analysis/M0_ARTIFACT_LOCK.json`：内容身份清单；
-- `scripts/run-m0-fixture.mjs`：无外部 Credential 的确定性输出、Security Evidence 和 F1–F9 离线契约 Fixture Harness；
-- `scripts/validate-m0.mjs`：无外部 Credential 的 YAML/JSON/Schema、引用、Hash、Grader/Identity 和配对检查；
-- `evals/csv-analysis/M0_FIXTURE_EVIDENCE.json`：输出 Hash、Security Finding 元数据和 Identity 示例数量。
+此后 M2–M7 的 Verify 循环明显收敛（多数里程碑一轮通过），该经验保留作为流程参考。
 
-最近一次检查：`npm run validate:m0`、`npm run validate:m0:hashes`、`node --check scripts/validate-m0.mjs` 和 `node --check scripts/run-m0-fixture.mjs` 通过。M0 没有执行真实 Model、Docker Sandbox 或网络 Runtime Probe；这些限制已记录为后续里程碑范围。
+## 下一步建议（尚未承诺）
 
-## M2 当前 Build 候选
+后续方向与阶段依赖见 [`docs/implementation/consolidation-roadmap.md`](docs/implementation/consolidation-roadmap.md)，以下是优先候选：
 
-已新增（候选实现，等待独立 Verify）：
-
-- `internal/lease`：高熵 Lease Token、Hash 和常量时间校验；
-- `internal/retry`：Retry Classification、有界 Exponential Backoff + Full Jitter；
-- `internal/scheduler`：Logical Trial/Attempt Identity、状态和稳定错误 Contract；
-- `internal/store`、`internal/store/postgres`：嵌入式 Goose SQL Migration、pgx Pool、物化、`FOR UPDATE SKIP LOCKED` Claim、Start/Heartbeat、Expiry Sweeper、Retry、Result Commit、Counter 和取消；
-- M2 CLI：`db migrate|status`、`experiment materialize|cancel`、`trial claim|start|heartbeat|complete`、`scheduler sweep`；
-- 真实 PostgreSQL 测试：Migration 幂等、40 Worker 并发 Claim、Heartbeat 负向、Completion 三次、响应丢失重发、Expiry Retry/迟到提交和两阶段取消。
-
-M2 冻结 `logical_trial_id=hash(pair_id,arm)`，保留 M1 `trial_id=hash(pair_id,arm,attempt)`，不声称 Exactly-once Execution。M2 不实现 REST、Worker gRPC、真实 Model、Sandbox、Artifact Store、Grading、Metrics 或 Release Gate。
-
-当前本地验证（2026-08-25 UTC）：`go test ./...`、`go test -race ./internal/store/postgres`、`go vet ./...`、真实 PostgreSQL 17.11 集成测试和 M2 CLI Migration/Materialize Smoke 已通过。完整 Gate 和文档一致性仍待独立 Verify。
-
-## M1 当前实现与下一步
-
-已建立：
-
-- `go.mod`、`cmd/skillgate` 以及 `internal/identity`、`internal/registry`、`internal/validation`、`internal/manifest`、`internal/experiment`；
-- Skill/Suite 内容寻址注册、双臂 Pair/Trial 编译和版本化 CLI JSON；
-- M0 示例编译目标：24 Pair、48 Trial；
-- M1 第二轮修复重点：完整引用 Root 边界、声明 Hash 投影、Suite 版本 API/原子写入、CLI 退出码与 Contract Tests。
-
-M1 第五轮独立 Verify 后，用户要求重新核对设计并完整收敛。已确认三项设计：Environment Identity=URI+Descriptor Hash；Skill Package=原始文本+LF；Suite 引用=Declared Hash。M1 已归档，M2 只消费其冻结的 Pair/Trial Plan，不改变 M1 Golden Identity。M1 不实现 Worker、Scheduler Runtime、真实 Model、Sandbox、gRPC 或 UI。
-
-## 下班 Checkpoint（2026-08-19 UTC）
-
-- Native change：`m1-registry-manifest-compiler`；分支：`comet/m1-registry-manifest-compiler`。
-- Native 当前：`phase=shape`、`stateVersion=27`、`next_action=confirm-shape`；尚未归档。
-- 最近父会话 Gate：`go test ./...`、`go vet ./...`、`go run ./cmd/skillgate --help`、M1 M0 compile、`npm run validate:m0` 均退出码 0。
-- M1 compile 输出：`version=skillgate.cli.v1`、`ok=true`、`compiled=true`、`pair_count=24`、`trial_count=48`、`diagnostics=0`；当前 normalized Manifest Hash 为 `sha256:248b0c6d1a3b0cb5d043c856c3a8f40e59a991554f8dcd8339f704092aac256d`。
-- M0 回归仍使用并通过既有冻结 Hash：Skill `sha256:5a2153eaf0a11af8d6141b87755526503e02a3af99080464cae27f49e5164090`、Suite `sha256:b76002abd734a4c9051927508b2a1371b97f7a01eda076b180dcfa6682f5373e`、Manifest `sha256:1e304d926d6ff2c5ec883a4cb1d4520fb75f95f8c1a1977cdc5f51f866290184`。
-- 工作区未提交；没有遗留 `.m1-*` Mutation 文件；M0 归档内容未修改。
-- 明日入口：确认已记录的三项 Shape 设计，不重新调查已确认事实；随后按 Runtime continuation 进入 Build/Verify。
-
-## 后续仍需决定的事项
-
-1. M3 Worker Protocol 的 gRPC/Protobuf 生成流程。
-2. License 和本地开发中的 Secret 管理方式。
-3. 第一个 MVP 是否必须包含 UI，还是先完成 CLI/Report。
-
-M2 已在 Shape 冻结 PostgreSQL Queue/Lease、Logical Trial/Attempt Identity、严格过期 Fence、两阶段取消、CLI + Fixture，以及 goose/pgx 版本选择；其余决定不会改变 M2 候选的当前边界。
-
-## 下一次会话清单
-
-1. ✅ M1 已归档并合并到 master（2026-08-25）。
-2. ✅ M2 已归档并合并到当前目标分支（2026-08-25）。
-3. ▶️ 提交 M3 Builder handoff，运行 Native 独立 Verify；若未通过，按最新 continuation 回到 Build 修复。
-4. ⏳ M3 Verify 通过并归档后，才进入 M4 LangGraph Worker 与 Sandbox；当前不得开始 M4。
+1. **P0 真实 Provider 验收**：用受控 Credential 先运行 Adapter Smoke，再完成最小匹配 Pair 的 gRPC/Grading/Report 闭环。
+2. **P1 License 与 Secret 最小边界**：Secret/Redaction/Rotation Runbook 与 MIT `LICENSE` 已补齐；个人项目暂不接入 CI。
+3. **P2 MinIO/S3 Artifact Store**：建立 Store 抽象、LocalFS Adapter 与对象存储集成。
+4. **P3–P5 OTel、UI 浏览器 E2E 与完整 Event Stream**：按稳定的 Correlation、Artifact 和 API 契约依次推进。
+5. **P6 Runtime Strategy Routing**：作为独立 M8，不与事后 Release Gate 混合。
 
 ## 明确延期的事项
 

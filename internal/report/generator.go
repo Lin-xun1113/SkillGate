@@ -22,14 +22,30 @@ var reportSchemaJSON []byte
 type Report struct {
 	Schema            string                      `json:"schema"`
 	ExperimentID      string                      `json:"experiment_id"`
+	Status            string                      `json:"status,omitempty"`
 	Metadata          ReportMetadata              `json:"metadata"`
 	Summary           ReportSummary               `json:"summary"`
 	CaseResults       []CaseResult                `json:"case_results"`
 	PassAtK           map[string]float64          `json:"pass_at_k,omitempty"`
 	ResourceUsage     ResourceUsage               `json:"resource_usage,omitempty"`
+	Trigger           *metrics.TriggerResult      `json:"trigger,omitempty"`
+	Security          *metrics.SecurityResult     `json:"security,omitempty"`
+	Evidence          EvidenceSummary             `json:"evidence"`
+	Artifacts         []EvidenceLink              `json:"artifacts,omitempty"`
 	InvalidPairs      []InvalidPair               `json:"invalid_pairs"`
 	StatisticalMethod StatisticalMethod           `json:"statistical_method"`
 	Decision          *releasegate.ReportDecision `json:"decision,omitempty"`
+}
+
+// ReportDetails contains the non-utility evidence projections collected by the
+// grading service. It is optional so existing report callers remain source
+// compatible while detailed pipeline callers can include trigger/security and
+// raw evidence links.
+type ReportDetails struct {
+	Trigger   *metrics.TriggerResult
+	Security  *metrics.SecurityResult
+	Evidence  EvidenceSummary
+	Artifacts []EvidenceLink
 }
 
 // ReportMetadata contains report metadata
@@ -64,8 +80,32 @@ type CaseResult struct {
 
 // ResourceUsage contains resource usage metrics
 type ResourceUsage struct {
-	TokenDelta   statistics.ResourceDelta `json:"token_delta"`
-	LatencyDelta statistics.ResourceDelta `json:"latency_delta"`
+	TokenDelta    statistics.ResourceDelta `json:"token_delta"`
+	LatencyDelta  statistics.ResourceDelta `json:"latency_delta"`
+	ToolCallDelta statistics.ResourceDelta `json:"tool_call_delta"`
+	CostDelta     statistics.ResourceDelta `json:"cost_delta"`
+}
+
+// EvidenceSummary records whether the report is suitable for a release claim.
+// It is deliberately explicit: a zero score is valid evidence, while absent or
+// incomplete evidence is a separate state and must not be interpreted as fail.
+type EvidenceSummary struct {
+	Complete             bool     `json:"complete"`
+	IdentityValid        bool     `json:"identity_valid"`
+	PairingValid         bool     `json:"pairing_valid"`
+	TriggerEvaluated     bool     `json:"trigger_evaluated"`
+	SecurityEvaluated    bool     `json:"security_evaluated"`
+	ReliabilityEvaluated bool     `json:"reliability_evaluated"`
+	IncompleteTrials     int      `json:"incomplete_trials"`
+	MissingEvidence      []string `json:"missing_evidence,omitempty"`
+}
+
+// EvidenceLink identifies an immutable artifact or trace used by a grade.
+type EvidenceLink struct {
+	TrialID      string   `json:"trial_id"`
+	CaseID       string   `json:"case_id,omitempty"`
+	TraceRef     string   `json:"trace_ref,omitempty"`
+	ArtifactRefs []string `json:"artifact_refs,omitempty"`
 }
 
 // InvalidPair represents an invalid pairing with reason
@@ -106,6 +146,7 @@ func (g *Generator) Generate(
 	totalTrials int,
 	passAtK map[string]float64,
 	resourceUsage *ResourceUsage,
+	details ...ReportDetails,
 ) (*Report, error) {
 	// Count valid and invalid pairs
 	validPairs := 0
@@ -180,6 +221,17 @@ func (g *Generator) Generate(
 			SignificanceLevel: 0.05,
 		},
 	}
+	if len(details) > 0 {
+		report.Trigger = details[0].Trigger
+		report.Security = details[0].Security
+		report.Evidence = details[0].Evidence
+		report.Artifacts = append([]EvidenceLink(nil), details[0].Artifacts...)
+		if !details[0].Evidence.Complete {
+			report.Status = "INCOMPLETE"
+		} else {
+			report.Status = "COMPLETED"
+		}
+	}
 	if resourceUsage != nil {
 		report.ResourceUsage = *resourceUsage
 	}
@@ -243,7 +295,11 @@ func (g *Generator) SaveMarkdown(report *Report) (string, error) {
 	md.WriteString(fmt.Sprintf("# Experiment Report: %s\n\n", report.Metadata.ExperimentName))
 	md.WriteString(fmt.Sprintf("**Experiment ID:** %s  \n", report.ExperimentID))
 	md.WriteString(fmt.Sprintf("**Generated:** %s  \n", report.Metadata.CreatedAt.Format(time.RFC3339)))
-	md.WriteString(fmt.Sprintf("**Status:** Completed\n\n"))
+	status := "Completed"
+	if !report.Evidence.Complete {
+		status = "Incomplete"
+	}
+	md.WriteString(fmt.Sprintf("**Status:** %s\n\n", status))
 
 	// Executive Summary
 	md.WriteString("## Executive Summary\n\n")
@@ -257,6 +313,8 @@ func (g *Generator) SaveMarkdown(report *Report) (string, error) {
 	md.WriteString(fmt.Sprintf("- **Statistically Significant:** %s\n", significance))
 	md.WriteString(fmt.Sprintf("- **Valid Pairs:** %d / %d\n\n",
 		report.Metadata.ValidPairs, report.Metadata.ValidPairs+report.Metadata.InvalidPairs))
+	md.WriteString(fmt.Sprintf("- **Evidence Complete:** %t (incomplete trials: %d)\n\n",
+		report.Evidence.Complete, report.Evidence.IncompleteTrials))
 
 	// Case-level Results
 	md.WriteString("## Case-level Results\n\n")
@@ -278,8 +336,18 @@ func (g *Generator) SaveMarkdown(report *Report) (string, error) {
 		md.WriteString(fmt.Sprintf("- **Latency Delta:** %+.0f ms (%+.1f%%)\n\n",
 			report.ResourceUsage.LatencyDelta.Delta,
 			report.ResourceUsage.LatencyDelta.DeltaRatio*100))
+		md.WriteString(fmt.Sprintf("- **Tool-call Delta:** %+.0f (%+.1f%%)\n", report.ResourceUsage.ToolCallDelta.Delta, report.ResourceUsage.ToolCallDelta.DeltaRatio*100))
+		md.WriteString(fmt.Sprintf("- **Cost Delta:** $%+.4f (%+.1f%%)\n\n", report.ResourceUsage.CostDelta.Delta, report.ResourceUsage.CostDelta.DeltaRatio*100))
 	} else {
 		md.WriteString("No resource usage data recorded for this experiment.\n\n")
+	}
+	if report.Trigger != nil {
+		md.WriteString("## Trigger Metrics\n\n")
+		md.WriteString(fmt.Sprintf("- **Recall:** %.3f\n- **Specificity:** %.3f\n- **Evaluated:** %t\n- **Incomplete Cases:** %d\n\n", report.Trigger.Recall, report.Trigger.Specificity, report.Trigger.Evaluated, report.Trigger.IncompleteCases))
+	}
+	if report.Security != nil {
+		md.WriteString("## Security Findings\n\n")
+		md.WriteString(fmt.Sprintf("- **Critical:** %d\n- **High:** %d\n- **Confirmed Exploits:** %d\n- **Evaluated:** %t\n- **Missing Evidence:** %d\n\n", report.Security.Critical, report.Security.High, report.Security.ConfirmedExploits, report.Security.Evaluated, report.Security.MissingEvidence))
 	}
 	if report.Decision != nil {
 		md.WriteString("## Release Decision\n\n")
@@ -352,6 +420,7 @@ func (g *Generator) SaveHTML(report *Report) (string, error) {
 		report.Summary.StatisticallySignificant))
 	html.WriteString(fmt.Sprintf("<li><strong>Valid Pairs:</strong> %d / %d</li>\n",
 		report.Metadata.ValidPairs, report.Metadata.ValidPairs+report.Metadata.InvalidPairs))
+	html.WriteString(fmt.Sprintf("<li><strong>Evidence Complete:</strong> %t</li>\n", report.Evidence.Complete))
 	html.WriteString("</ul>\n")
 
 	html.WriteString("<h2>Case-level Results</h2>\n")
@@ -369,6 +438,12 @@ func (g *Generator) SaveHTML(report *Report) (string, error) {
 			cr.CaseID, cr.BaselineScore, cr.CandidateScore, diffClass, cr.Difference))
 	}
 	html.WriteString("</table>\n")
+	if report.Trigger != nil {
+		html.WriteString(fmt.Sprintf("<h2>Trigger Metrics</h2><p>Recall: %.3f; Specificity: %.3f; Evaluated: %t; Incomplete: %d</p>\n", report.Trigger.Recall, report.Trigger.Specificity, report.Trigger.Evaluated, report.Trigger.IncompleteCases))
+	}
+	if report.Security != nil {
+		html.WriteString(fmt.Sprintf("<h2>Security Findings</h2><p>Critical: %d; High: %d; Confirmed exploits: %d; Evaluated: %t; Missing evidence: %d</p>\n", report.Security.Critical, report.Security.High, report.Security.ConfirmedExploits, report.Security.Evaluated, report.Security.MissingEvidence))
+	}
 
 	if report.Decision != nil {
 		html.WriteString("<h2>Release Decision</h2>\n")

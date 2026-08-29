@@ -1,6 +1,11 @@
 package metrics
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestAggregateTriggerRecallAndSpecificity(t *testing.T) {
 	cases := []CaseMeta{
@@ -50,6 +55,49 @@ func TestAggregateTriggerMajorityTieIsNotLoaded(t *testing.T) {
 	}
 }
 
+func TestAggregateTriggerReadsNestedSuiteSkillAssertion(t *testing.T) {
+	cases := []CaseMeta{
+		{CaseID: "positive", EvaluationMode: "autonomous_trigger", Population: "trigger", Polarity: "should_trigger"},
+		{CaseID: "negative", EvaluationMode: "autonomous_trigger", Population: "trigger", Polarity: "should_not_trigger"},
+	}
+	grades := func(assertion string) []byte {
+		value := map[string]any{"graders": []any{map[string]any{
+			"passed": true,
+			"evidence": map[string]any{"assertions": []any{map[string]any{
+				"type": "trace_assertion", "message": assertion, "passed": true,
+			}}},
+		}}}
+		data, _ := json.Marshal(value)
+		return data
+	}
+	got := AggregateTrigger(cases, []TriggerInput{
+		{CaseID: "positive", Arm: "with_skill", Passed: true, GradesJSON: grades("skill_loaded:csv-analysis")},
+		{CaseID: "negative", Arm: "with_skill", Passed: true, GradesJSON: grades("skill_not_loaded:csv-analysis")},
+	})
+	if got.Recall != 1 || got.Specificity != 1 {
+		t.Fatalf("nested skill assertions not reflected: %+v", got)
+	}
+}
+
+func TestTrialSkillLoadedRequiresExplicitSkillAssertion(t *testing.T) {
+	tests := []struct {
+		name   string
+		grades []byte
+	}{
+		{name: "empty", grades: nil},
+		{name: "empty manifest", grades: []byte(`{}`)},
+		{name: "malformed", grades: []byte(`{"graders":`)},
+		{name: "generic pass", grades: []byte(`{"graders":[{"passed":true,"message":"answer quality passed","evidence":{"assertions":[{"id":"output-valid","passed":true}]} }]}`)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if loaded := trialSkillLoaded(TriggerInput{Passed: true, GradesJSON: tt.grades}); loaded {
+				t.Fatalf("generic trial pass must not imply skill loaded for %s", tt.name)
+			}
+		})
+	}
+}
+
 func TestAggregateTriggerIncompleteWhenCandidateMissing(t *testing.T) {
 	cases := []CaseMeta{
 		{CaseID: "pos-1", EvaluationMode: "autonomous_trigger", Population: "trigger", Polarity: "should_trigger"},
@@ -92,5 +140,41 @@ func TestAggregateSecurityCountsAndMissingEvidence(t *testing.T) {
 	}
 	if got.MissingEvidence != 1 {
 		t.Fatalf("missing=%d, want 1", got.MissingEvidence)
+	}
+}
+
+func TestLoadSecurityFindingEmptyObjectIsMissingEvidence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "security-finding.json")
+	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	finding, err := LoadSecurityFinding(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if finding.Present {
+		t.Fatalf("empty finding must not be present: %+v", finding)
+	}
+}
+
+func TestFindingPathUsesSuiteOutputDirectory(t *testing.T) {
+	got := FindingPath("/artifacts", "exp", "trial")
+	want := filepath.Join("/artifacts", "exp", "trial", "output", "security-finding.json")
+	if got != want {
+		t.Fatalf("FindingPath = %q, want %q", got, want)
+	}
+}
+
+func TestLoadSecurityFindingRequiresAuditableFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "security-finding.json")
+	if err := os.WriteFile(path, []byte(`{"severity":"high"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	finding, err := LoadSecurityFinding(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if finding.Present {
+		t.Fatalf("finding without status must be incomplete: %+v", finding)
 	}
 }

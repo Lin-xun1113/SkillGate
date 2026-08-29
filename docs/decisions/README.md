@@ -12,5 +12,7 @@
 - `ADR-008-m1-registry-manifest-compiler.md`
 - `ADR-009-m2-postgresql-scheduler-reliability.md`
 - `ADR-010-m3-runner-protocol-integrity.md`
+- `ADR-011-provider-runtime-security-boundary.md`
+- `ADR-012-secret-source-and-compose-boundary.md`
 
 新决策使用 `docs/templates/adr.md`。状态只有在实现和测试验证后才能改为 `IMPLEMENTED`。

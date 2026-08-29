@@ -1,6 +1,7 @@
 # 安全运维手册
 
-**状态：** `FUTURE → M3`；`PROPOSED`，真实不可信执行前必须复核
+**状态：** `PROVISIONAL → P1`；2026-08-30 UTC  服务器级 Secret Manager、KMS、mTLS 仍未接入
+**版本：** v0.2
 
 ## 1. 安全默认值
 
@@ -48,11 +49,16 @@ Skill 注册前：
 
 ## 4. Provider Credential 轮换
 
-- 本地开发只使用最小权限测试 Key；
-- Key 不进入 Manifest、DB、Artifact 或 Git；
-- 发现泄漏时先撤销再调查；
-- Redaction 不能替代 Key Rotation；
-- 日志错误信息也要脱敏。
+- 本地开发只使用最小权限测试 Key；默认 Compose 使用 Fixture，不需要 Provider Key；
+- Key 只能通过 `OPENAI_API_KEY`/`OPENAI_API_KEY_FILE` 或 `ANTHROPIC_API_KEY`/`ANTHROPIC_API_KEY_FILE` 注入 Worker；`*_FILE` 优先；
+- Key 不进入 Manifest、`execution_hash`、Runner Request、DB、Artifact、Trace、命令参数或 Git；
+- 轮换步骤：创建新 Key → 写入新的 Secret 文件（权限 `0600`）→ 原子替换/更新挂载 → 重启 Worker → 用 `scripts/verify-secrets.sh` 和受控 Provider Smoke 验证 → 撤销旧 Key；当前 Worker 在启动/Provider 初始化时读取，**不支持热更新**；
+- 发现泄漏时先暂停相关 Worker/出口并立即撤销旧 Key，再保存最小元数据（时间、版本、受影响实验 ID），不得复制原始日志/Trace；
+- Redaction 不能替代 Key Rotation；SDK 错误、FailTrial、Event 和报告写入前必须脱敏。
+
+数据库 URL 也应使用 `SKILLGATE_DATABASE_URL_FILE`（兼容 `DATABASE_URL_FILE`）。CLI 的 `--database-url` 仅为兼容无密码 URL，含密码 DSN 会 Fail Closed。
+
+Local Insecure Demo 与 Production 的边界、Secret Source 错误码见 [`../contracts/secret-source.md`](../contracts/secret-source.md)。
 
 ## 5. Artifact 访问
 
@@ -77,6 +83,15 @@ Skill 注册前：
 发现 → 隔离 → 撤销 Credential → 保存元数据 → 分析根因
 → 增加回归测试 → 修复 → 重新扫描 → 重新评估 → 复核 Release Decision
 ```
+
+### 7.1 最小验证命令
+
+```bash
+bash scripts/verify-secrets.sh
+bash scripts/check-licenses.sh   # 本地手动检查；依赖工具未安装时会报告 SKIP
+```
+
+脚本只使用合成 Sentinel，不读取、上传或打印真实用户数据、生产 Trace 或 Provider Key。
 
 ## 8. 安全限制声明
 

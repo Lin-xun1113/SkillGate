@@ -6,6 +6,7 @@
   "properties": {
     "schema": { "type": "string" },
     "experiment_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["COMPLETED", "INCOMPLETE"] },
     "metadata": {
       "type": "object",
       "required": ["experiment_name", "created_at", "total_trials", "valid_pairs", "invalid_pairs"],
@@ -53,7 +54,58 @@
       "type": "object",
       "properties": {
         "token_delta": { "$ref": "#/definitions/resourceDelta" },
-        "latency_delta": { "$ref": "#/definitions/resourceDelta" }
+        "latency_delta": { "$ref": "#/definitions/resourceDelta" },
+        "tool_call_delta": { "$ref": "#/definitions/resourceDelta" },
+        "cost_delta": { "$ref": "#/definitions/resourceDelta" }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "properties": {
+        "recall": { "type": "number" },
+        "specificity": { "type": "number" },
+        "evaluated": { "type": "boolean" },
+        "positive_cases": { "type": "integer", "minimum": 0 },
+        "negative_cases": { "type": "integer", "minimum": 0 },
+        "incomplete_cases": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "critical": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "confirmed_exploits": { "type": "integer", "minimum": 0 },
+        "evaluated": { "type": "boolean" },
+        "missing_evidence": { "type": "integer", "minimum": 0 },
+        "probe_cases": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["complete", "identity_valid", "pairing_valid", "trigger_evaluated", "security_evaluated", "reliability_evaluated", "incomplete_trials"],
+      "properties": {
+        "complete": { "type": "boolean" },
+        "identity_valid": { "type": "boolean" },
+        "pairing_valid": { "type": "boolean" },
+        "trigger_evaluated": { "type": "boolean" },
+        "security_evaluated": { "type": "boolean" },
+        "reliability_evaluated": { "type": "boolean" },
+        "incomplete_trials": { "type": "integer", "minimum": 0 },
+        "missing_evidence": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["trial_id"],
+        "properties": {
+          "trial_id": { "type": "string" },
+          "case_id": { "type": "string" },
+          "trace_ref": { "type": "string" },
+          "artifact_refs": { "type": "array", "items": { "type": "string" } }
+        }
       }
     },
     "invalid_pairs": {

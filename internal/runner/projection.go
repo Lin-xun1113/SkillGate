@@ -36,15 +36,9 @@ func ProjectExecution(
 	}
 
 	// Compute execution hash using canonical algorithm
-	executionHash, err = ComputeExecutionHash(
-		manifestHash,
-		caseID,
-		arm,
-		skillHash,
-		model,
-		toolPolicy,
-		environment,
-	)
+	// Hash the exact execution object, including case_input. manifest_hash and
+	// arm are already covered by the scheduling/request identity envelope.
+	executionHash, err = ComputeExecutionHashForSpec(execution)
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to compute execution hash: %w", err)
 	}

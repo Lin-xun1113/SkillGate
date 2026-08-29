@@ -30,11 +30,11 @@ func TestPayloadContainsExecutionSegment(t *testing.T) {
 
 	// Now project execution
 	execution := &runner.ExecutionSpec{
-		CaseID:    "case1",
-		CaseInput: map[string]any{"fixtures": []any{}},
-		SkillHash: "abc123",
-		Model:     map[string]any{"provider": "mock"},
-		ToolPolicy: map[string]any{},
+		CaseID:      "case1",
+		CaseInput:   map[string]any{"fixtures": []any{}},
+		SkillHash:   "abc123",
+		Model:       map[string]any{"provider": "mock"},
+		ToolPolicy:  map[string]any{},
 		Environment: map[string]any{},
 	}
 

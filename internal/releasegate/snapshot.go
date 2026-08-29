@@ -85,7 +85,10 @@ func BuildSnapshot(in SnapshotInput) (Snapshot, error) {
 		snap.Utility.CILower = -1
 		snap.Utility.CIUpper = 1
 	}
-	incomplete := in.IncompleteTrials > 0 || in.Trigger.IncompleteCases > 0 || in.Security.MissingEvidence > 0
+	triggerRequired := in.Trigger.PositiveCases+in.Trigger.NegativeCases > 0
+	triggerIncomplete := in.Trigger.IncompleteCases > 0 || (triggerRequired && !in.Trigger.Evaluated)
+	securityIncomplete := in.Security.MissingEvidence > 0 || (in.Security.ProbeCases > 0 && !in.Security.Evaluated)
+	incomplete := in.IncompleteTrials > 0 || triggerIncomplete || securityIncomplete
 	snap.Evidence.Complete = in.IdentityValid && in.PairingValid && !incomplete &&
 		(in.Security.ProbeCases == 0 || in.Security.Evaluated)
 	hash, err := identity.HashCanonical(snap.Canonical())
@@ -132,6 +135,7 @@ func (s Snapshot) Canonical() map[string]any {
 		},
 		"experiment": map[string]any{
 			"pairing_valid":     s.Experiment.PairingValid,
+			"invalid_pairs":     s.Experiment.InvalidPairs,
 			"incomplete_trials": s.Experiment.IncompleteTrials,
 		},
 	}

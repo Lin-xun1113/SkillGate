@@ -1,8 +1,10 @@
 # SkillGate 实施计划
 
 **状态：** `ACCEPTED` 作为开发顺序基线  
-**当前阶段：** 仅完成文档与架构设计，尚未开始编码  
+**当前阶段：** 本文是初始实施计划；M0–M7 已实现并通过独立 Verify，当前状态与已知限制以 [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md) 为准。
 **建议周期：** 个人全职投入约 6–8 周；业余投入按比例延长
+
+> 本文保留立项时的里程碑目标和验收设计，不作为逐项实时进度表。已完成项的最终证据见 `docs/comet/archive/`；真实 Provider、S3/MinIO 和 OTel 等限制仍未宣称完成。
 
 ## 1. 实施原则
 
@@ -22,7 +24,7 @@
 | M1 | 第 1 周 | Skill Registry、Suite Registry、Manifest Compiler | 可编译并拒绝非法 Pair 的 CLI/API |
 | M2 | 第 2 周 | PostgreSQL Scheduler、Lease、Retry、幂等 Commit | Worker 崩溃后任务可恢复且不重复计分 |
 | M3 | 第 3 周 | Runner Protocol 和 Fixture Worker | Go 与 Python Stub Worker 完成一次协议闭环 |
-| M4 | 第 4–5 周 | LangGraph Worker、Sandbox、Trace/Artifact | 至少一个真实 Agent Trial 可运行并可回放 |
+| M4 | 第 4–5 周 | LangGraph Worker、Sandbox、Trace/Artifact | 至少一个可回放的 Agent Trial（当前为 Fixture Provider） |
 | M5 | 第 5–6 周 | Grader、Metric、统计聚合 | 生成有/无 Skill 的 Lift、CI、pass@k 报告 |
 | M6 | 第 6–7 周 | CEL Strategy Engine、Release Gate | 输出可解释的 PROMOTE/HOLD/REJECT |
 | M7 | 第 7–8 周 | UI、OTel、故障注入、文档与演示 | 端到端 Demo、压测和故障报告 |

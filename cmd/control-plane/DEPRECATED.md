@@ -6,12 +6,12 @@ This binary has been deprecated in favor of the unified `skillgate serve` comman
 
 Instead of running:
 ```bash
-control-plane --port 50051 --db postgres://... --artifacts ./artifacts --graders ./graders
+SKILLGATE_DATABASE_URL_FILE=/run/secrets/database-url control-plane --port 50051 --artifacts ./artifacts --graders ./graders
 ```
 
 Use:
 ```bash
-skillgate serve --grpc-addr :50051 --database-url postgres://... --artifacts-dir ./artifacts --graders-dir ./graders
+SKILLGATE_DATABASE_URL_FILE=/run/secrets/database-url skillgate serve --grpc-addr :50051 --artifacts-dir ./artifacts --graders-dir ./graders
 ```
 
 ## Why Deprecated

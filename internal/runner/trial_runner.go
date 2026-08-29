@@ -138,13 +138,16 @@ func (r *TrialRunner) ExecuteTrial(ctx context.Context, claim scheduler.Claim, m
 	}
 
 	var workerResult struct {
-		TrialID   string                 `json:"trial_id"`
-		Outcome   string                 `json:"outcome"`
-		Category  string                 `json:"category,omitempty"`
-		Message   string                 `json:"message,omitempty"`
-		Events    []map[string]any       `json:"events"`
-		Artifacts map[string]string      `json:"artifacts"`
-		Trace     map[string]any         `json:"trace,omitempty"`
+		TrialID  string           `json:"trial_id"`
+		Outcome  string           `json:"outcome"`
+		Category string           `json:"category,omitempty"`
+		Message  string           `json:"message,omitempty"`
+		Events   []map[string]any `json:"events"`
+		// The local worker emits the protocol ArtifactManifest list while older
+		// sandbox workers emitted a name -> hash object. Decode both forms below
+		// so upgrading the worker cannot turn a valid result into result_invalid.
+		Artifacts json.RawMessage `json:"artifacts"`
+		Trace     map[string]any  `json:"trace,omitempty"`
 	}
 
 	if err := json.Unmarshal(resultData, &workerResult); err != nil {
@@ -160,6 +163,20 @@ func (r *TrialRunner) ExecuteTrial(ctx context.Context, claim scheduler.Claim, m
 		}, nil
 	}
 
+	artifacts, err := decodeWorkerArtifacts(workerResult.Artifacts)
+	if err != nil {
+		return TrialExecutionResult{
+			TrialID:       claim.TrialID,
+			RequestHash:   requestHash,
+			ExecutionHash: executionHash,
+			Outcome:       "error",
+			Category:      "result_invalid",
+			Message:       fmt.Sprintf("Failed to parse artifacts: %v", err),
+			Logs:          logs,
+			DurationMs:    time.Since(startTime).Milliseconds(),
+		}, nil
+	}
+
 	return TrialExecutionResult{
 		TrialID:       claim.TrialID,
 		RequestHash:   requestHash,
@@ -168,7 +185,7 @@ func (r *TrialRunner) ExecuteTrial(ctx context.Context, claim scheduler.Claim, m
 		Category:      workerResult.Category,
 		Message:       workerResult.Message,
 		Events:        workerResult.Events,
-		Artifacts:     workerResult.Artifacts,
+		Artifacts:     artifacts,
 		Trace:         workerResult.Trace,
 		ExitCode:      exitCode,
 		Logs:          logs,
@@ -176,18 +193,54 @@ func (r *TrialRunner) ExecuteTrial(ctx context.Context, claim scheduler.Claim, m
 	}, nil
 }
 
+// decodeWorkerArtifacts accepts both the current Artifact metadata list and
+// the pre-protocol object form used by early local workers.
+func decodeWorkerArtifacts(raw json.RawMessage) (map[string]string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return map[string]string{}, nil
+	}
+	var object map[string]string
+	if err := json.Unmarshal(raw, &object); err == nil {
+		return object, nil
+	}
+	var list []struct {
+		Name        string `json:"name"`
+		ContentHash string `json:"content_hash"`
+		SHA256      string `json:"sha256"`
+		Hash        string `json:"hash"`
+	}
+	if err := json.Unmarshal(raw, &list); err != nil {
+		return nil, err
+	}
+	result := make(map[string]string, len(list))
+	for _, item := range list {
+		if item.Name == "" {
+			return nil, fmt.Errorf("artifact name is required")
+		}
+		hash := item.ContentHash
+		if hash == "" {
+			hash = item.SHA256
+		}
+		if hash == "" {
+			hash = item.Hash
+		}
+		result[item.Name] = hash
+	}
+	return result, nil
+}
+
 // TrialExecutionResult holds the complete result of a trial execution.
 type TrialExecutionResult struct {
-	TrialID       string             `json:"trial_id"`
-	RequestHash   string             `json:"request_hash"`
-	ExecutionHash string             `json:"execution_hash"`
-	Outcome       string             `json:"outcome"`
-	Category      string             `json:"category,omitempty"`
-	Message       string             `json:"message,omitempty"`
-	Events        []map[string]any   `json:"events,omitempty"`
-	Artifacts     map[string]string  `json:"artifacts,omitempty"`
-	Trace         map[string]any     `json:"trace,omitempty"`
-	ExitCode      int64              `json:"exit_code"`
-	Logs          string             `json:"logs,omitempty"`
-	DurationMs    int64              `json:"duration_ms"`
+	TrialID       string            `json:"trial_id"`
+	RequestHash   string            `json:"request_hash"`
+	ExecutionHash string            `json:"execution_hash"`
+	Outcome       string            `json:"outcome"`
+	Category      string            `json:"category,omitempty"`
+	Message       string            `json:"message,omitempty"`
+	Events        []map[string]any  `json:"events,omitempty"`
+	Artifacts     map[string]string `json:"artifacts,omitempty"`
+	Trace         map[string]any    `json:"trace,omitempty"`
+	ExitCode      int64             `json:"exit_code"`
+	Logs          string            `json:"logs,omitempty"`
+	DurationMs    int64             `json:"duration_ms"`
 }

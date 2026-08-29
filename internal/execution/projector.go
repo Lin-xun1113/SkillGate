@@ -2,13 +2,13 @@ package execution
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/Lin-xun1113/SkillGate/internal/manifest"
 	"github.com/Lin-xun1113/SkillGate/internal/runner"
+	"gopkg.in/yaml.v3"
 )
 
 // Projector resolves manifest_hash + pair_id + arm into ExecutionSpec.
@@ -66,16 +66,50 @@ func (p *Projector) Project(ctx context.Context, manifestHash, pairID, arm strin
 			"retry":   extractMap(strategy, "retry"),
 			"sandbox": extractMap(strategy, "sandbox"),
 		},
-		Environment: map[string]any{}, // populated from manifest execution section if needed
+		Environment: environmentFromManifest(mf),
 	}
 
-	// Compute execution_hash
-	execHash, err := computeExecutionHash(spec)
+	// Hash exactly the execution object sent in TrialRequest. The runner package
+	// owns this canonical algorithm so Go and Python cannot drift.
+	execHash, err := runner.ComputeExecutionHashForSpec(spec)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to compute execution hash: %w", err)
 	}
 
 	return spec, execHash, nil
+}
+
+func environmentFromManifest(mf *manifest.LoadedManifest) map[string]any {
+	if mf == nil {
+		return map[string]any{}
+	}
+	rawSpec, _ := mf.Raw["spec"].(map[string]any)
+	execution, _ := rawSpec["execution"].(map[string]any)
+	ref, _ := execution["environmentDescriptor"].(string)
+	if ref == "" {
+		return map[string]any{}
+	}
+	candidates := []string{
+		filepath.Join(filepath.Dir(mf.SourcePath), ref),
+		filepath.Join(mf.ProjectRoot(), ref),
+		ref,
+		filepath.Join("environments", filepath.Base(ref)),
+	}
+	for _, path := range candidates {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var doc map[string]any
+		if yaml.Unmarshal(data, &doc) != nil {
+			continue
+		}
+		if value, ok := doc["spec"].(map[string]any); ok {
+			return value
+		}
+		return doc
+	}
+	return map[string]any{}
 }
 
 // extractMap safely extracts a nested map.
@@ -84,23 +118,4 @@ func extractMap(parent map[string]any, key string) map[string]any {
 		return val
 	}
 	return map[string]any{}
-}
-
-// computeExecutionHash produces canonical SHA-256 of ExecutionSpec.
-func computeExecutionHash(spec *runner.ExecutionSpec) (string, error) {
-	bytes, err := json.Marshal(spec)
-	if err != nil {
-		return "", err
-	}
-	// Canonical JSON: sorted keys
-	var canonical map[string]interface{}
-	if err := json.Unmarshal(bytes, &canonical); err != nil {
-		return "", err
-	}
-	canonicalBytes, err := json.Marshal(canonical)
-	if err != nil {
-		return "", err
-	}
-	hash := sha256.Sum256(canonicalBytes)
-	return hex.EncodeToString(hash[:]), nil
 }

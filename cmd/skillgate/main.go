@@ -28,6 +28,8 @@ func main() {
 		code = suiteCommand(os.Args[2:])
 	case "compile":
 		code = compileCommand(os.Args[2:])
+	case "cas":
+		code = casCommand(os.Args[2:])
 	case "db":
 		code = databaseCommand(os.Args[2:])
 	case "experiment":
@@ -54,12 +56,13 @@ func usage() {
 	fmt.Println("skillgate skill validate|register <path> [--json]")
 	fmt.Println("skillgate suite validate|register <path> [--registry-root <path>] [--json]")
 	fmt.Println("skillgate compile <manifest> [--registry-root <path>] [--json]")
-	fmt.Println("skillgate db migrate|status [--database-url <url>] [--json]")
+	fmt.Println("skillgate cas prepare <manifest> [--cas-dir <path>] [--project-root <path>] [--json]")
+	fmt.Println("skillgate db migrate|status [--database-url-file <path>] [--json]")
 	fmt.Println("skillgate experiment materialize <manifest>|cancel [options] [--json]")
 	fmt.Println("skillgate trial claim|start|heartbeat|complete [options] [--request-hash <hash>] [--idempotency-key <key>] [--json]")
 	fmt.Println("skillgate scheduler sweep [--limit <n>] [--json]")
-	fmt.Println("skillgate serve [--grpc-addr <addr>] [--database-url <url>] [--json]")
-	fmt.Println("skillgate ui [--listen <addr>] [--database-url <url>] [--json]")
+	fmt.Println("skillgate serve [--grpc-addr <addr>] [--database-url-file <path>] [--project-root <path>] [--cas-dir <path>] [--sweep-interval <duration>] [--json]")
+	fmt.Println("skillgate ui [--listen <addr>] [--database-url-file <path>] [--artifacts-dir <path>] [--json]")
 }
 
 func skillCommand(args []string) int {
@@ -219,6 +222,8 @@ func codeFor(code string) int {
 	case "REGISTRY_CONFLICT":
 		return 7
 	case "IO_ERROR", "DATABASE_UNAVAILABLE", "MIGRATION_FAILED":
+		return 8
+	case "SECRET_MISSING", "SECRET_EMPTY", "SECRET_UNREADABLE", "SECRET_INVALID_NAME":
 		return 8
 	case "IDENTITY_CONFLICT", "OWNER_MISMATCH", "LEASE_MISMATCH", "LEASE_EXPIRED", "STATUS_CONFLICT", "RESULT_CONFLICT", "LOGICAL_TRIAL_TERMINAL", "EXPERIMENT_CANCEL_REQUESTED", "RETRY_EXHAUSTED", "NOT_CLAIMABLE", "TRIAL_NOT_FOUND":
 		return 9

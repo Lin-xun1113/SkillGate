@@ -2,6 +2,7 @@ package releasegate
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Lin-xun1113/SkillGate/internal/identity"
@@ -46,6 +47,25 @@ func Evaluate(policy *strategy.Policy, snap Snapshot) Decision {
 		base.PolicyID = policy.Metadata.Name
 		base.PolicyVersion = policy.Metadata.Version
 		base.PolicyHash = policy.Hash
+	}
+	// A decision is only meaningful for the exact frozen policy and snapshot
+	// identities. Reject tampered snapshots; hold when the supplied policy does
+	// not match the experiment's declared policy hash.
+	if snap.Hash != "" {
+		if expected, err := identity.HashCanonical(snap.Canonical()); err != nil || expected != snap.Hash {
+			base.Result = strategy.DecisionReject
+			base.Explanation = "snapshot hash mismatch; evidence is tampered"
+			base.FailedConditions = []strategy.FailedCondition{{Reason: "snapshot_hash_mismatch", Actual: snap.Hash}}
+			base.DecisionID = decisionID(base)
+			return base
+		}
+	}
+	if policy != nil && isContentHash(snap.PolicyHash) && isContentHash(policy.Hash) && policy.Hash != snap.PolicyHash {
+		base.Result = strategy.DecisionHold
+		base.Explanation = "policy hash mismatch; fail closed to HOLD"
+		base.FailedConditions = []strategy.FailedCondition{{Reason: "policy_hash_mismatch", Actual: policy.Hash}}
+		base.DecisionID = decisionID(base)
+		return base
 	}
 
 	if policy == nil {
@@ -105,6 +125,18 @@ func Evaluate(policy *strategy.Policy, snap Snapshot) Decision {
 	}
 	base.DecisionID = decisionID(base)
 	return base
+}
+
+func isContentHash(value string) bool {
+	if len(value) != len("sha256:")+64 || !strings.HasPrefix(value, "sha256:") {
+		return false
+	}
+	for _, r := range value[len("sha256:"):] {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func decisionID(d Decision) string {

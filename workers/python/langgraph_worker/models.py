@@ -1,7 +1,37 @@
-"""Data models for LangGraph Worker."""
+"""Data models for the LangGraph Worker protocol."""
 
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+
+try:
+    from pydantic import BaseModel, Field
+except ImportError:  # pragma: no cover - keeps the module importable for tooling
+    import copy
+    class BaseModel:  # minimal compatibility shim for local protocol checks
+        def __init__(self, **kwargs):
+            # ``Field(default_factory=...)`` is evaluated while the class is
+            # declared below. Copy declared defaults onto each instance so
+            # traces, events and artifacts never leak between trials.
+            for cls in reversed(type(self).__mro__):
+                for key in getattr(cls, "__annotations__", {}):
+                    if hasattr(cls, key):
+                        setattr(self, key, copy.deepcopy(getattr(cls, key)))
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+        def model_dump(self):
+            def dump(value):
+                if isinstance(value, BaseModel):
+                    return {key: dump(item) for key, item in value.__dict__.items()}
+                if isinstance(value, list):
+                    return [dump(item) for item in value]
+                if isinstance(value, dict):
+                    return {key: dump(item) for key, item in value.items()}
+                return value
+
+            return {key: dump(value) for key, value in self.__dict__.items()}
+
+    def Field(default_factory):
+        return default_factory()
 
 
 class ExecutionSpec(BaseModel):
@@ -71,13 +101,13 @@ class TrialTrace(BaseModel):
 class TrialResult(BaseModel):
     """Trial execution result."""
     trial_id: str
-    worker_id: str
-    request_hash: str
-    execution_hash: str
-    outcome: str  # success, error, timeout, cancelled
+    worker_id: str = ""
+    request_hash: str = ""
+    execution_hash: str = ""
+    outcome: str = "FAILED"  # SUCCEEDED, FAILED, TIMED_OUT, CANCELLED
     category: str = ""
     error_message: Optional[str] = None
-    duration_ms: int
-    events: List[TrialEvent]
+    duration_ms: int = 0
+    events: List[TrialEvent] = Field(default_factory=list)
     trace: Optional[TrialTrace] = None
     artifacts: List[Artifact] = Field(default_factory=list)

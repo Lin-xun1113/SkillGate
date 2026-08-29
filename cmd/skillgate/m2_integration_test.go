@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Lin-xun1113/SkillGate/internal/scheduler"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -99,7 +100,16 @@ func TestM2CLIRealPostgresLifecycle(t *testing.T) {
 	if err := os.WriteFile(resultFile, []byte(`{"version":"skillgate.result.v1","fixture":"cli"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	manifestHash, err := scheduler.ResultManifestHash([]byte(`{"version":"skillgate.result.v1","fixture":"cli"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	idempotencyKey, err := scheduler.ResultIdempotencyKey(trialID, manifestHash)
+	if err != nil {
+		t.Fatal(err)
+	}
 	completeArgs := []string{"trial", "complete", "--logical-trial-id", logicalTrialID, "--result-manifest", resultFile, "--outcome", "SUCCEEDED"}
+	completeArgs = append(completeArgs, "--request-hash", claimData["request_hash"].(string), "--idempotency-key", idempotencyKey)
 	completeArgs = append(completeArgs, common...)
 	completed := run(completeArgs...)
 	if completed["operation"] != "trial.complete" {

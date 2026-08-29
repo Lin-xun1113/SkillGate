@@ -41,9 +41,15 @@ type TrialResult struct {
 	InputTokens     int     `json:"input_tokens"`
 	OutputTokens    int     `json:"output_tokens"`
 	LatencyMS       int     `json:"latency_ms"`
+	ToolCalls       int     `json:"tool_calls,omitempty"`
+	CostUSD         float64 `json:"cost_usd,omitempty"`
 	ModelHash       string  `json:"model_hash"`
 	EnvironmentHash string  `json:"environment_hash"`
 	GraderHash      string  `json:"grader_hash"`
+	EvaluationMode  string  `json:"evaluation_mode,omitempty"`
+	Population      string  `json:"population,omitempty"`
+	Polarity        string  `json:"polarity,omitempty"`
+	EvidenceStatus  string  `json:"evidence_status,omitempty"`
 }
 
 // AggregateCaseScores aggregates trial scores into case-level scores

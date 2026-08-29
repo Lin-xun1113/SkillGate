@@ -1,31 +1,33 @@
-# Docker Deployment
+# Docker 部署
 
-The canonical Docker Compose configuration is located in:
+权威 Docker Compose 配置位于：
 
 ```
 deploy/docker-compose.yml
 ```
 
-## Quick Start
+## 快速开始
 
 ```bash
 cd deploy
 docker compose up --build
 ```
 
-This will start:
-- PostgreSQL database
-- Bootstrap service (runs migrations and initial setup)
-- Control Plane gRPC server (port 50051)
-- Fixture Worker (processes trial executions)
+这会启动：
+- PostgreSQL 数据库
+- Bootstrap 服务（迁移、CAS/Grader 准备与实验物化）
+- Control Plane gRPC 服务（端口 50051）
+- LangGraph Worker（使用离线 Fixture Provider 执行 Trial）
+- Web UI（端口 8080）
 
-## Architecture
+## 架构
 
-The deployment uses:
-- `deploy/Dockerfile.server` - Builds the Control Plane server
-- `deploy/Dockerfile.worker` - Builds the Python fixture worker
-- `deploy/compose-bootstrap.sh` - Initialization script
+部署使用：
+- `deploy/Dockerfile.server`：构建 Control Plane 与 UI
+- `workers/python/langgraph_worker/Dockerfile`：构建默认 LangGraph Worker
+- `deploy/Dockerfile.worker`：构建可选协议 Fixture Worker（Compose profile=`fixture`）
+- `deploy/compose-bootstrap.sh`：初始化脚本
 
-## Historical Note
+## 历史说明
 
-Previous versions of this project had `docker-compose.yml` and `docker-compose.yaml` files at the repository root. These have been removed as they referenced obsolete commands and non-existent Dockerfiles. All current deployment configuration is maintained in the `deploy/` directory.
+项目早期曾在仓库根目录放置 `docker-compose.yml` 与 `docker-compose.yaml`，因引用过时命令和不存在的 Dockerfile 已移除。当前部署配置统一维护在 `deploy/` 目录。

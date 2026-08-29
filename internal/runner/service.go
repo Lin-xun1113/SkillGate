@@ -65,6 +65,7 @@ func NewRunnerService(qStore store.QueueStore, opts *ServiceOptions) *RunnerServ
 			opt.MaxLeaseDuration = opts.MaxLeaseDuration
 		}
 		opt.Projector = opts.Projector
+		opt.ArtifactsRoot = opts.ArtifactsRoot
 	}
 	return &RunnerService{
 		store:     qStore,
@@ -131,6 +132,10 @@ func (s *RunnerService) ClaimTrial(ctx context.Context, req *runnerv1.ClaimTrial
 	if !s.sessions.Validate(req.WorkerId, req.SessionToken) {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid or expired session_token for worker %s", req.WorkerId)
 	}
+	// Claim polling is the worker's liveness signal while it is idle. Refresh
+	// the session here so a healthy long-running worker does not expire between
+	// trials simply because it has no active lease to heartbeat.
+	s.sessions.TouchHeartbeat(req.WorkerId)
 
 	leaseDuration := s.opts.MaxLeaseDuration
 	if req.LeaseDurationSec > 0 {
@@ -161,8 +166,13 @@ func (s *RunnerService) ClaimTrial(ctx context.Context, req *runnerv1.ClaimTrial
 		return nil, status.Errorf(codes.Internal, "failed to build trial request: %v", err)
 	}
 
-	// M4: Project execution content if projector is configured
-	if s.projector != nil && claim.ManifestHash != "" {
+	// Project execution content whenever the scheduler supplied a manifest.
+	// A claimed trial without its execution projection is not executable; fail
+	// closed instead of silently handing a worker an incomplete request.
+	if claim.ManifestHash != "" {
+		if s.projector == nil {
+			return nil, status.Error(codes.FailedPrecondition, "execution projector is not configured")
+		}
 		execSpec, execHash, err := s.projector.Project(ctx, claim.ManifestHash, claim.PairID, claim.Arm)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to project execution: %v", err)
@@ -617,6 +627,10 @@ func jsonOrEmpty(raw string) []byte {
 }
 
 func mapFailureCategory(cat runnerv1.FailureCategory) retry.Category {
+	// Keep the protobuf enum stable on the wire.  These mappings are the only
+	// translation from worker/provider vocabulary to scheduler policy:
+	// TIMEOUT intentionally uses the existing retryable LEASE_TIMEOUT bucket
+	// (the bucket covers an attempt/provider deadline, not only lease expiry).
 	switch cat {
 	case runnerv1.FailureCategory_FAILURE_CATEGORY_TRANSIENT:
 		return retry.ProviderTransient

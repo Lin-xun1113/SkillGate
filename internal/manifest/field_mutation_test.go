@@ -40,3 +40,42 @@ func TestManifestFieldMutationsReject(t *testing.T) {
 		})
 	}
 }
+
+func TestManifestRejectsProviderRuntimeFields(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	source, err := os.ReadFile(filepath.Join(root, "experiments/csv-analysis-v1-demo.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name      string
+		injection string
+		field     string
+	}{
+		{name: "base-url", injection: "base_url: https://untrusted.example/v1", field: "base_url"},
+		{name: "endpoint", injection: "endpoint: https://untrusted.example/v1", field: "endpoint"},
+		{name: "headers", injection: "headers:\n            Authorization: attacker", field: "headers"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mutated := strings.ReplaceAll(
+				string(source),
+				"          temperature: 0",
+				"          temperature: 0\n          "+test.injection,
+			)
+			path := filepath.Join(root, "experiments", ".provider-runtime-"+test.name+".yaml")
+			if err := os.WriteFile(path, []byte(mutated), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			defer os.Remove(path)
+
+			_, diagnostics := Compile(path, root)
+			for _, diagnostic := range diagnostics {
+				if diagnostic.Code == "PROVIDER_RUNTIME_FIELD_FORBIDDEN" && strings.Contains(diagnostic.Path, test.field) {
+					return
+				}
+			}
+			t.Fatalf("expected PROVIDER_RUNTIME_FIELD_FORBIDDEN for %s, diagnostics=%#v", test.field, diagnostics)
+		})
+	}
+}

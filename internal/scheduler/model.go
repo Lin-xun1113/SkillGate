@@ -71,6 +71,10 @@ const (
 	CodeExperimentCancelRequested ErrorCode = "EXPERIMENT_CANCEL_REQUESTED"
 	CodeRetryExhausted            ErrorCode = "RETRY_EXHAUSTED"
 	CodeInvalidArgument           ErrorCode = "INVALID_ARGUMENT"
+	CodeSecretMissing             ErrorCode = "SECRET_MISSING"
+	CodeSecretEmpty               ErrorCode = "SECRET_EMPTY"
+	CodeSecretUnreadable          ErrorCode = "SECRET_UNREADABLE"
+	CodeSecretInvalidName         ErrorCode = "SECRET_INVALID_NAME"
 )
 
 type Error struct {

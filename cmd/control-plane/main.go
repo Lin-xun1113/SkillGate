@@ -12,16 +12,17 @@ import (
 
 	"github.com/Lin-xun1113/SkillGate/internal/grader"
 	"github.com/Lin-xun1113/SkillGate/internal/grading"
+	"github.com/Lin-xun1113/SkillGate/internal/secrets"
 	"github.com/Lin-xun1113/SkillGate/internal/store/postgres"
 	"google.golang.org/grpc"
 )
 
 var (
-	port              = flag.String("port", "50051", "gRPC server port")
-	dbPath            = flag.String("db", "skillgate.db", "SQLite database path")
-	casRoot           = flag.String("cas", "./cas", "CAS root directory")
-	artifactsDir      = flag.String("artifacts", "./artifacts", "Artifacts directory")
-	gradersDir        = flag.String("graders", "./graders", "Graders directory")
+	port                = flag.String("port", "50051", "gRPC server port")
+	dbPath              = flag.String("db", "skillgate.db", "SQLite database path")
+	casRoot             = flag.String("cas", "./cas", "CAS root directory")
+	artifactsDir        = flag.String("artifacts", "./artifacts", "Artifacts directory")
+	gradersDir          = flag.String("graders", "./graders", "Graders directory")
 	gradingPollInterval = flag.Duration("grading-poll-interval", 5*time.Second, "Grading poll interval")
 )
 
@@ -48,12 +49,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize database (PostgreSQL)
-	// TODO: Read connection string from environment
-	connString := os.Getenv("DATABASE_URL")
-	if connString == "" {
-		log.Println("DATABASE_URL not set, using default")
-		connString = "postgres://localhost:5432/skillgate?sslmode=disable"
+	// Initialize database (PostgreSQL). This deprecated binary follows the same
+	// file-backed boundary as `skillgate serve`; it no longer invents an
+	// implicit connection or puts credentials in a command-line argument.
+	connString, err := secrets.Lookup("SKILLGATE_DATABASE_URL")
+	if err != nil && !secrets.Configured("SKILLGATE_DATABASE_URL") && secrets.Configured("DATABASE_URL") {
+		connString, err = secrets.Lookup("DATABASE_URL")
+	}
+	if err != nil {
+		log.Fatalf("database Secret unavailable: %v", err)
 	}
 
 	store, err := postgres.Open(ctx, connString)

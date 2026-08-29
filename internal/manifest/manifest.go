@@ -136,7 +136,7 @@ func CompileWithDependencies(manifestPath, projectRoot string, resolver Referenc
 		return nil, diagnostics
 	}
 	strategies := map[string]map[string]any{}
-	for _, raw := range strategyList {
+	for index, raw := range strategyList {
 		if item, ok := raw.(map[string]any); ok {
 			if name, ok := item["name"].(string); ok {
 				if _, exists := strategies[name]; exists {
@@ -144,7 +144,19 @@ func CompileWithDependencies(manifestPath, projectRoot string, resolver Referenc
 				}
 				strategies[name] = item
 			}
+			if field := forbiddenProviderRuntimeField(item["model"]); field != "" {
+				diagnostics = append(diagnostics, validation.Diagnostic{
+					Code:     "PROVIDER_RUNTIME_FIELD_FORBIDDEN",
+					Severity: "error",
+					Path:     fmt.Sprintf("spec.strategies[%d].model.%s", index, field),
+					Message:  "Provider Endpoint、Credential 与自定义 Header 只能由受信 Operator 环境注入，不能写入 Manifest。",
+				})
+			}
+			diagnostics = append(diagnostics, validateProviderModel(item["model"], fmt.Sprintf("spec.strategies[%d].model", index))...)
 		}
+	}
+	if len(diagnostics) > 0 {
+		return nil, diagnostics
 	}
 	baseline, hasBaseline := strategies["baseline"]
 	candidate, hasCandidate := strategies["candidate"]
@@ -428,6 +440,48 @@ func stringValue(value any) string {
 
 func strategyProjection(strategy map[string]any, skills []map[string]any) map[string]any {
 	return map[string]any{"model": strategy["model"], "skills": skillsOrEmpty(skills), "tools": strategy["tools"], "budget": strategy["budget"], "retry": strategy["retry"], "sandbox": strategy["sandbox"]}
+}
+
+func forbiddenProviderRuntimeField(value any) string {
+	forbidden := map[string]struct{}{
+		"api_base": {}, "apibase": {}, "api_endpoint": {}, "apiendpoint": {},
+		"api_key": {}, "apikey": {}, "base_url": {}, "baseurl": {},
+		"credential": {}, "credentials": {}, "endpoint": {}, "headers": {},
+		"http_headers": {}, "httpheaders": {}, "password": {}, "secret": {}, "token": {},
+	}
+	var walk func(any, string) string
+	walk = func(current any, prefix string) string {
+		switch typed := current.(type) {
+		case map[string]any:
+			keys := make([]string, 0, len(typed))
+			for key := range typed {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				normalized := strings.ToLower(strings.ReplaceAll(key, "-", "_"))
+				path := key
+				if prefix != "" {
+					path = prefix + "." + key
+				}
+				if _, blocked := forbidden[normalized]; blocked {
+					return path
+				}
+				if found := walk(typed[key], path); found != "" {
+					return found
+				}
+			}
+		case []any:
+			for index, child := range typed {
+				path := fmt.Sprintf("%s[%d]", prefix, index)
+				if found := walk(child, path); found != "" {
+					return found
+				}
+			}
+		}
+		return ""
+	}
+	return walk(value, "")
 }
 func skillsOrEmpty(skills []map[string]any) []map[string]any {
 	if skills == nil {

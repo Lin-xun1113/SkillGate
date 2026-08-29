@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/Lin-xun1113/SkillGate/internal/manifest"
 	"github.com/Lin-xun1113/SkillGate/internal/retry"
 	"github.com/Lin-xun1113/SkillGate/internal/scheduler"
+	"github.com/Lin-xun1113/SkillGate/internal/secrets"
 	storepg "github.com/Lin-xun1113/SkillGate/internal/store/postgres"
 )
 
@@ -232,11 +235,79 @@ func openM2Store(ctx context.Context, args []string, jsonOutput bool) (*storepg.
 }
 
 func databaseURL(args []string) (string, error) {
-	value := flagValue(args, "--database-url", os.Getenv("SKILLGATE_DATABASE_URL"))
-	if value == "" {
-		return "", &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "必须设置 --database-url 或 SKILLGATE_DATABASE_URL"}
+	if hasFlag(args, "--database-url-file") {
+		path := flagValue(args, "--database-url-file", "")
+		if strings.TrimSpace(path) == "" {
+			return "", &scheduler.Error{Code: scheduler.CodeSecretEmpty, Message: "--database-url-file 不能为空"}
+		}
+		return readDatabaseURLFile(path)
+	}
+	// Keep the legacy flag for source compatibility, but reject a password in
+	// the argument itself: command lines are visible through shell history and
+	// container process inspection. Operators should use *_FILE or an env var.
+	if value := flagValue(args, "--database-url", ""); value != "" {
+		if err := rejectInlineDatabaseCredential(value); err != nil {
+			return "", err
+		}
+		return value, nil
+	}
+	for _, name := range []string{"SKILLGATE_DATABASE_URL", "DATABASE_URL"} {
+		if secrets.Configured(name) {
+			value, err := secrets.Lookup(name)
+			if err != nil {
+				return "", secretSchedulerError(err)
+			}
+			return value, nil
+		}
+	}
+	return "", &scheduler.Error{Code: scheduler.CodeSecretMissing, Message: "必须设置 SKILLGATE_DATABASE_URL_FILE、SKILLGATE_DATABASE_URL 或 DATABASE_URL_FILE"}
+}
+
+func hasFlag(args []string, name string) bool {
+	for _, arg := range args {
+		if arg == name {
+			return true
+		}
+	}
+	return false
+}
+
+func readDatabaseURLFile(path string) (string, error) {
+	value, err := secrets.LookupWith("SKILLGATE_DATABASE_URL", func(name string) (string, bool) {
+		if name == "SKILLGATE_DATABASE_URL_FILE" {
+			return path, true
+		}
+		return "", false
+	}, nil)
+	if err != nil {
+		return "", secretSchedulerError(err)
 	}
 	return value, nil
+}
+
+func secretSchedulerError(err error) error {
+	var secretErr *secrets.Error
+	if errors.As(err, &secretErr) {
+		return &scheduler.Error{Code: scheduler.ErrorCode(secretErr.Code), Message: secretErr.Error(), Cause: err}
+	}
+	return &scheduler.Error{Code: scheduler.CodeSecretUnreadable, Message: "无法读取数据库 Secret", Cause: err}
+}
+
+func rejectInlineDatabaseCredential(value string) error {
+	parsed, err := url.Parse(value)
+	if err == nil && parsed.User != nil {
+		if _, hasPassword := parsed.User.Password(); hasPassword {
+			return &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "数据库密码不得通过 --database-url 命令行传递；请使用 --database-url-file 或 SKILLGATE_DATABASE_URL_FILE"}
+		}
+	}
+	// Also reject libpq-style DSNs if a caller passes one despite the URL name.
+	lower := strings.ToLower(value)
+	for _, marker := range []string{"password=", "passfile=", "sslkey="} {
+		if strings.Contains(lower, marker) {
+			return &scheduler.Error{Code: scheduler.CodeInvalidArgument, Message: "数据库 Secret 不得通过命令行传递；请使用 --database-url-file 或 *_FILE"}
+		}
+	}
+	return nil
 }
 
 func readSecretFile(path string) (string, error) {

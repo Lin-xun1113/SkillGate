@@ -1,0 +1,34 @@
+# Environment files and operator-managed secrets must never enter image layers.
+.env
+.env.*
+!.env.example
+deploy/secrets/
+**/*secret*
+**/*credential*
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+
+# Local state, traces and generated artifacts are runtime volumes.
+.git/
+.gitignore
+.skillgate/
+artifacts/
+traces/
+reports/
+results/
+postgres-data/
+minio-data/
+otel-data/
+evals/results/
+experiments/runs/
+
+# Development caches and tooling output.
+.venv/
+venv/
+node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/

@@ -1,0 +1,43 @@
+# PRODUCTION PROFILE
+#
+# This file is an override, not a source of credentials. Both paths are
+# mandatory and must point to operator-managed files outside the repository.
+# Start with:
+#   SKILLGATE_POSTGRES_PASSWORD_FILE=/run/operator/postgres-password \
+#   SKILLGATE_DATABASE_URL_FILE=/run/operator/database-url \
+#   docker compose -f deploy/docker-compose.yml \
+#     -f deploy/docker-compose.production.yml --profile production up --build
+services:
+  postgres:
+    profiles: ["production"]
+    environment:
+      SKILLGATE_PROFILE: production
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  bootstrap:
+    profiles: ["production"]
+    environment:
+      SKILLGATE_PROFILE: production
+
+  control-plane:
+    profiles: ["production"]
+    environment:
+      SKILLGATE_PROFILE: production
+
+  langgraph-worker:
+    profiles: ["production"]
+    environment:
+      SKILLGATE_PROFILE: production
+
+  ui:
+    profiles: ["production"]
+    environment:
+      SKILLGATE_PROFILE: production
+
+secrets:
+  postgres_password:
+    file: ${SKILLGATE_POSTGRES_PASSWORD_FILE:?SKILLGATE_POSTGRES_PASSWORD_FILE must point to an operator-managed secret file}
+  database_url:
+    file: ${SKILLGATE_DATABASE_URL_FILE:?SKILLGATE_DATABASE_URL_FILE must point to an operator-managed secret file}

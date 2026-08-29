@@ -1,0 +1,3 @@
+-r requirements.txt
+-r langgraph_worker/requirements.txt
+pytest>=8.0

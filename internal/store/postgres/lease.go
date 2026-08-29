@@ -54,7 +54,7 @@ LIMIT 1`, filter.PreferredExperimentID).Scan(&claim.ExperimentID)
 		return scheduler.Claim{}, err
 	}
 	err = tx.QueryRow(ctx, `
-SELECT a.trial_id, a.logical_trial_id, a.attempt_no, l.timeout_ms, e.budget_deadline_at, l.pair_id, l.arm
+SELECT a.trial_id, a.logical_trial_id, a.attempt_no, l.timeout_ms, e.budget_deadline_at, l.pair_id, l.arm, e.manifest_hash
 FROM trial_attempts a
 JOIN logical_trials l ON l.logical_trial_id=a.logical_trial_id
 JOIN experiments e ON e.experiment_id=l.experiment_id
@@ -64,7 +64,7 @@ WHERE e.experiment_id=$1 AND a.status='PENDING' AND a.not_before <= clock_timest
   AND clock_timestamp() < e.budget_deadline_at
 ORDER BY a.priority DESC, a.not_before, a.created_at, a.trial_id
 FOR UPDATE OF a SKIP LOCKED
-LIMIT 1`, claim.ExperimentID).Scan(&claim.TrialID, &claim.LogicalTrialID, &claim.Attempt, &timeoutMS, &budgetDeadline, &claim.PairID, &claim.Arm)
+	LIMIT 1`, claim.ExperimentID).Scan(&claim.TrialID, &claim.LogicalTrialID, &claim.Attempt, &timeoutMS, &budgetDeadline, &claim.PairID, &claim.Arm, &claim.ManifestHash)
 	if err == pgx.ErrNoRows {
 		return scheduler.Claim{}, &scheduler.Error{Code: scheduler.CodeNotClaimable, Message: "当前 experiment 的可领取 attempt 已被其他 Scheduler 获取"}
 	}

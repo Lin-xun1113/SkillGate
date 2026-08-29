@@ -203,6 +203,8 @@ CREATE TABLE experiment_reports (
 
 ## 实现状态
 
+> 本节已按当前代码与 M5/M6 Verify 结果同步。前文的目录和“下一步”保留为 M5 立项时的设计记录；跨里程碑的最新进度以 [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md) 为准。
+
 - [x] Grader Registry
 - [x] Grader Executor (Deterministic)
 - [x] Metrics Aggregator
@@ -210,9 +212,9 @@ CREATE TABLE experiment_reports (
 - [x] Report Generator (JSON, Markdown, HTML)
 - [x] 数据库 Schema 变更
 - [x] 单元测试
-- [ ] 集成到 Control Plane（待完成）
-- [ ] 端到端测试（待完成）
-- [ ] docker compose 演示（待完成）
+- [x] 集成到 Control Plane
+- [x] 端到端测试（Fixture Provider）
+- [x] docker compose 演示
 
 ## 下一步
 

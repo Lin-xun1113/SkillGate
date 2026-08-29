@@ -51,6 +51,14 @@ evals/results/
 *.key
 credentials.json
 secrets.json
+
+# Local Codex/Comet agent runtime state
+.agents/
+.codex/
+
+deploy/secrets/*.local
+deploy/secrets/*.secret
+deploy/secrets/*-production*
 # >>> Comet managed project state >>>
 !/.comet/
 /.comet/*

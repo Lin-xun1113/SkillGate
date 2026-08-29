@@ -3,9 +3,11 @@ services:
     image: postgres:17-alpine
     container_name: skillgate-postgres
     environment:
-      POSTGRES_USER: skillgate
-      POSTGRES_PASSWORD: skillgate_password
-      POSTGRES_DB: skillgate
+      POSTGRES_USER: ${SKILLGATE_POSTGRES_USER:-skillgate}
+      POSTGRES_DB: ${SKILLGATE_POSTGRES_DB:-skillgate}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
     ports:
       - "5432:5432"
     healthcheck:
@@ -20,10 +22,16 @@ services:
       dockerfile: deploy/Dockerfile.server
     container_name: skillgate-bootstrap
     environment:
-      DATABASE_URL: postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable
+      SKILLGATE_DATABASE_URL_FILE: /run/secrets/database_url
+      SKILLGATE_PROFILE: local-insecure-demo
+    secrets:
+      - database_url
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - cas:/app/cas
+      - graders:/app/graders
     entrypoint: ["/usr/local/bin/compose-bootstrap.sh"]
     command: []
 
@@ -33,24 +41,37 @@ services:
       dockerfile: deploy/Dockerfile.server
     container_name: skillgate-control-plane
     environment:
-      DATABASE_URL: postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable
+      SKILLGATE_DATABASE_URL_FILE: /run/secrets/database_url
+      SKILLGATE_PROFILE: local-insecure-demo
+    secrets:
+      - database_url
     ports:
       - "50051:50051"
+    healthcheck:
+      # The server image is Alpine, whose busybox provides nc. This checks
+      # readiness of the gRPC listener without adding an HTTP health service.
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 50051"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
     volumes:
       - artifacts:/app/artifacts
       - graders:/app/graders
+      - cas:/app/cas
     depends_on:
       postgres:
         condition: service_healthy
       bootstrap:
         condition: service_completed_successfully
-    command: ["serve", "--grpc-addr", "0.0.0.0:50051", "--database-url", "postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable", "--artifacts-dir", "/app/artifacts", "--graders-dir", "/app/graders"]
+    command: ["serve", "--grpc-addr", "0.0.0.0:50051", "--project-root", "/app", "--cas-dir", "/app/cas", "--artifacts-dir", "/app/artifacts", "--graders-dir", "/app/graders"]
 
   fixture-worker:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.worker
     container_name: skillgate-fixture-worker
+    profiles: ["fixture"]
     environment:
       RUNNER_GRPC_ADDR: control-plane:50051
       ARTIFACTS_ROOT: /app/artifacts
@@ -58,10 +79,34 @@ services:
       - artifacts:/app/artifacts
     depends_on:
       control-plane:
-        condition: service_started
+        condition: service_healthy
       bootstrap:
         condition: service_completed_successfully
     command: ["--server", "control-plane:50051", "--worker-id", "compose-worker-01", "--max-trials", "48", "--delay", "0.02"]
+    restart: on-failure
+
+  langgraph-worker:
+    build:
+      context: ..
+      dockerfile: workers/python/langgraph_worker/Dockerfile
+    container_name: skillgate-langgraph-worker
+    environment:
+      CONTROL_PLANE_ADDR: control-plane:50051
+      WORKER_ID: compose-langgraph-worker-01
+      CAS_DIR: /app/cas
+      ARTIFACTS_DIR: /app/artifacts
+      SKILLGATE_EVALS_ROOT: /app/evals/csv-analysis
+      MAX_TRIALS: "48"
+    volumes:
+      - cas:/app/cas:ro
+      - artifacts:/app/artifacts
+    depends_on:
+      control-plane:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+    command: ["--server", "control-plane:50051", "--worker-id", "compose-langgraph-worker-01", "--cas", "/app/cas", "--artifacts", "/app/artifacts", "--max-trials", "48"]
+    restart: on-failure
 
   ui:
     build:
@@ -69,7 +114,10 @@ services:
       dockerfile: deploy/Dockerfile.server
     container_name: skillgate-ui
     environment:
-      SKILLGATE_DATABASE_URL: postgres://skillgate:skillgate_password@postgres:5432/skillgate?sslmode=disable
+      SKILLGATE_DATABASE_URL_FILE: /run/secrets/database_url
+      SKILLGATE_PROFILE: local-insecure-demo
+    secrets:
+      - database_url
     ports:
       - "8080:8080"
     volumes:
@@ -78,9 +126,19 @@ services:
       postgres:
         condition: service_healthy
       control-plane:
-        condition: service_started
-    command: ["ui", "--listen", "0.0.0.0:8080"]
+        condition: service_healthy
+    command: ["ui", "--listen", "0.0.0.0:8080", "--artifacts-dir", "/app/artifacts"]
 
 volumes:
   artifacts:
   graders:
+  cas:
+
+# The checked-in files are synthetic, offline-only Demo credentials. They are
+# mounted as Docker Secrets and excluded from image build contexts. Production
+# must use deploy/docker-compose.production.yml with externally supplied files.
+secrets:
+  postgres_password:
+    file: ${SKILLGATE_POSTGRES_PASSWORD_FILE:-./secrets/demo-postgres-password}
+  database_url:
+    file: ${SKILLGATE_DATABASE_URL_FILE:-./secrets/demo-database-url}

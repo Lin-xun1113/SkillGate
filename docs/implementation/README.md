@@ -7,6 +7,7 @@
 3. `worker-work-breakdown.md` —— **`FUTURE → M3`** Python/LangGraph Worker 任务拆解
 4. `testing-and-validation.md` —— 测试、故障注入和评估有效性
 5. `performance-plan.md` —— **`FUTURE → M4`** Benchmark 和容量验证
+6. `consolidation-roadmap.md` —— **`PROPOSED`** M0–M7 之后的 Provider、Artifact、OTel、UI E2E、Event 与 Runtime Routing 收尾路线
 
 ## 开发约束
 

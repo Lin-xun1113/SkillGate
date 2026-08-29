@@ -98,6 +98,9 @@ model:
   name: gpt-example
   config:
     temperature: 0
+    max_tokens: 4096
+    timeout_seconds: 60
+    max_retries: 0
 skills:
   - name: csv-analysis
     version: sha256:abc...
@@ -125,6 +128,18 @@ Strategy 中禁止出现：
 - 任意 Shell Script；
 - 未声明的 Endpoint；
 - 能修改 Experiment Identity 的运行时变量。
+
+`model.config.temperature`、`model.config.max_tokens`、`model.config.timeout_seconds`
+与 `model.config.max_retries` 属于冻结的 Model
+Identity，Worker 会把它们传给 Provider SDK。`max_retries` 默认 `0`，让有界
+重试由 Scheduler 统一负责；如显式启用 SDK 内重试，其值也必须随 Manifest
+冻结。Provider Endpoint 不属于 Manifest 配置面：`base_url` / `endpoint`
+不能由 Skill、Suite 或 Manifest 覆盖，只能由 Operator 进程环境中的
+`OPENAI_BASE_URL` / `ANTHROPIC_BASE_URL` 提供；Manifest 中出现
+`base_url` / `endpoint` 时 Worker 必须拒绝执行，防止不可信输入把 Credential
+重定向到攻击者控制的地址。
+
+完整 Adapter、响应/Usage 与失败分类见 [`provider-runtime.md`](provider-runtime.md)。
 
 ## 6. Suite 与 Case 规则
 

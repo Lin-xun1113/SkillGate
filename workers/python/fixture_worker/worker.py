@@ -257,8 +257,19 @@ class FixtureWorker:
         # 1. Verify Request Hash.
         try:
             req_obj = json.loads(claim.trial_request_json)
-            if sha256_canonical(req_obj) != claim.request_hash:
+            identity = {
+                "experiment_id": req_obj.get("experiment_id", ""),
+                "logical_trial_id": req_obj.get("logical_trial_id", ""),
+                "trial_id": req_obj.get("trial_id", ""),
+                "pair_id": req_obj.get("pair_id", ""),
+                "arm": req_obj.get("arm", ""),
+                "attempt_no": int(req_obj.get("attempt_no", 0)),
+            }
+            if sha256_canonical(identity) != claim.request_hash:
                 logger.error("Request hash verification failed!")
+                return False
+            if req_obj.get("trial_id") != claim.trial_id or req_obj.get("logical_trial_id") != claim.logical_trial_id:
+                logger.error("Claim identity does not match trial_request_json")
                 return False
             logger.info("Request hash verified successfully.")
         except Exception as exc:
