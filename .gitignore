@@ -64,3 +64,5 @@ deploy/secrets/*-production*
 /.comet/*
 !/.comet/config.yaml
 # <<< Comet managed project state <<<
+
+docs/personal/

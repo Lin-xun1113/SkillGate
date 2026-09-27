@@ -145,7 +145,7 @@ docs/comet/archive/   # M0–M7 各里程碑 brief/spec/verification 归档
 - 不声称 Exactly-once Execution（设计立场：至少一次执行 + 幂等提交）；
 - Artifact Storage 目前是本地文件系统/Compose 卷，MinIO/S3 尚未接入；
 - OpenTelemetry SDK 在依赖中但主流程尚未接入遥测导出；
-- OpenAI/Anthropic Adapter 已有离线 Contract Test 与显式 Live Smoke 入口，但尚未使用真实 Credential 完成 gRPC/Grading/Report 端到端验收。
+- OpenAI/Anthropic Adapter 已有离线 Contract Test；2026-09-03 完成过一次受控单 Pair 的真实 Provider 闭环，但样本、Grader 和 Sandbox 覆盖不足以证明 Skill Lift 或生产能力。
 - 项目采用 MIT 许可证，版权主体为 `Lin-xun1113`，见根目录 [`LICENSE`](LICENSE)；第三方依赖检查流程见 [`docs/operations/license-management.md`](docs/operations/license-management.md)。个人项目暂不接入 CI。
 
 完整清单见 [`PROJECT_STATUS.md`](PROJECT_STATUS.md) 的「当前已知限制」。

@@ -37,7 +37,17 @@ go run ./cmd/skillgate skill validate skills/csv-analysis
 
 已完成 OpenAI/Anthropic Adapter 的离线契约加固：统一 `invoke` 接口，冻结 `model.config` 四字段 allowlist（temperature `0..2`、max_tokens `1..1000000`、timeout_seconds `(0,600]`、max_retries `0..30`），保留 `complete` 兼容入口和受限 legacy aliases；Manifest Compiler 与 Worker 双重拒绝未知字段、错误类型、越界值以及由实验内容注入的 Base URL、Endpoint、Credential 或 Header。响应统一归一化文本、Tool Call、实际 Model 与 Token Usage，并将 Provider 429/5xx/timeout/鉴权/参数错误映射为稳定 Runner Failure Category；Provider 错误链、Trace、Event、Result Manifest 和 `FailTrial` 在持久化前脱敏。归一化 Usage 随 `CompleteTrial` 写入结果证据。
 
-本轮实际通过 Python Worker `75 passed, 2 skipped`（包括 Injected OpenAI/Anthropic Contract Test）；两个跳过项分别是必须显式设置 `LIVE_PROVIDER_SMOKE=1` 的真实 Adapter Smoke 与 `LIVE_PROVIDER_FULL_CHAIN=1` 的 full-chain preflight marker。`./scripts/provider-live-smoke.sh` 默认输出 `SKIP`，显式开启但无 Credential 时 Fail Closed，并固定 1 Case、64 output token、30 秒、`0.05 USD` 上限。由于当前没有受控 Credential，未调用真实 OpenAI/Anthropic API，也未完成真实 Provider 的 gRPC → Grading → Report → Decision E2E；默认 48-trial Compose 仍为 Fixture Provider。契约见 `docs/contracts/provider-runtime.md`，剩余路线见 `docs/implementation/consolidation-roadmap.md`。
+本轮实际通过 Python Worker `75 passed, 2 skipped`（包括 Injected OpenAI/Anthropic Contract Test）；两个跳过项分别是必须显式设置 `LIVE_PROVIDER_SMOKE=1` 的真实 Adapter Smoke 与 `LIVE_PROVIDER_FULL_CHAIN=1` 的 full-chain preflight marker。`./scripts/provider-live-smoke.sh` 默认输出 `SKIP`，显式开启但无 Credential 时 Fail Closed，并固定 1 Case、64 output token、30 秒、`0.05 USD` 上限。**截至 2026-08-30 UTC 的本节验收时**没有受控 Credential，未调用真实 OpenAI/Anthropic API，也未完成真实 Provider 的 gRPC → Grading → Report → Decision E2E；默认 48-trial Compose 仍为 Fixture Provider。2026-09-03 的后续单 Pair 结果见下节。契约见 `docs/contracts/provider-runtime.md`，剩余路线见 `docs/implementation/consolidation-roadmap.md`。
+
+## 2026-09-03 受控真实 Provider 单 Pair 验收
+
+在上述离线/默认 Fixture 验证之后，2026-09-03 UTC 使用临时 Operator Credential，经 OpenAI-compatible Gateway 对模型 `gpt-5.6-terra` 做了一次隔离的单 Pair 控制面验收。本次没有修改默认 Compose 配置，也没有把 Credential 或 Gateway 地址写入仓库。
+
+- 临时 Manifest 编译为 1 个 `without_skill`/`with_skill` Pair、2 个 Trial；独立 PostgreSQL Docker 容器迁移至 v6，CAS 和 Grader 物化成功。
+- 两个 Trial 均真实调用 Provider 并收到 HTTP `200`；Go Control Plane → PostgreSQL → gRPC → Python Worker → Artifact/Trace → Deterministic Grading → Report → CEL Decision 全链路完成，Experiment 为 `COMPLETED`，2/2 Trial `SUCCEEDED`，2/2 Grader `scored`。
+- 两臂均得到 `score=1`，`mean_lift=0`；最终 Decision 为 `HOLD`，原因是只有 1 个 Case/Pair、没有 Trigger Case，且 Grader 只检查 `result.txt` 存在，不能据此判断 Skill Utility。
+- 本次 Worker 直接运行在本机 Python 虚拟环境，没有经过 Docker Sandbox；没有执行 Security Probe、真实效果矩阵、生产容量或 OTel/S3 验收。第一次尝试因临时总预算过期被 Sweeper 正确收敛为 `BUDGET_EXHAUSTED`，第二次在准备完成后重跑通过。
+- 原始验收笔记留在本地，不进入本仓库，也不新增系统 Contract。
 
 ## 2026-08-30 复核
 
@@ -79,7 +89,7 @@ M5/M6 之后按 `docs/audits/` 中的审计完成了 P0/P1 缺陷修复（Gradin
 1. **不声称 Exactly-once Execution。** 执行语义始终是“至少一次执行 + 幂等提交”；这是设计立场而非缺陷。
 2. **Artifact Storage 使用本地文件系统/Compose 卷。** MinIO/S3 兼容对象存储在架构文档中规划，尚未接入。
 3. **OpenTelemetry SDK 在依赖中，但主流程尚未接入遥测导出。** 架构文档中的可观测性目标属于后续工作。
-4. **真实 LLM Provider 未做端到端验收。** OpenAI/Anthropic Adapter 已完成离线 Contract Test 与显式 Live Smoke 入口，但全部已执行验证仍基于 Fixture/Fake Client，未消耗真实 Model Credential。
+4. **真实 LLM Provider 仅完成受控单 Pair 控制面验收。** OpenAI/Anthropic Adapter 已完成离线 Contract Test；2026-09-03 的 `gpt-5.6-terra` 单 Pair 已走通 Provider → gRPC → Grading → Report → Decision，但 Worker 未经过 Docker Sandbox，且样本、Grader、Trigger/Security 矩阵不足以证明真实 Skill Lift 或生产能力。
 5. **Web UI 存在 Builder 声明的已知限制：** 无端到端集成测试、模板渲染未单元测试、响应式布局未经浏览器实际验证（见 M7 verification）。
 6. **里程碑中途的文档描述可能与最终 Verify 结论不一致。** 例如旧版根 README 在 M4 中途将 A4（mock Provider 流程）与 A6（取消中断）标记为部分实现/待实现，而 M4 最终 verification.md 的结论是全部 8 项验收通过；两处冲突时以各里程碑 `verification.md` 为准。
 7. **Go-managed Sandbox 的执行日志仍是占位信息。** `RunTrial` 当前返回固定完成文本；真实 stdout/stderr 捕获、大小限制和脱敏纳入后续完整 Event/诊断阶段。
@@ -94,7 +104,7 @@ M5/M6 之后按 `docs/audits/` 中的审计完成了 P0/P1 缺陷修复（Gradin
 - PostgreSQL 是实验元数据和生命周期状态的事实来源；大型 Artifact 规划走 S3-compatible Object Storage。
 - CEL-Go 作为 Policy Expression Engine；Docker Sandbox 是初始隔离手段。
 
-选择该方向的背景与理由：目标是 Binance Accelerator Program —— Golang Engineer（Strategy Engine）岗位的作品集项目，混合架构让 Go Backend、Rule/Strategy Engine、可靠异步任务处理成为系统主体，同时保留可信的 Agent 评估方法论内容。
+选择该方向的背景与理由：目标是 Golang Engineer 岗位的作品集项目，混合架构让 Go Backend、Rule/Strategy Engine、可靠异步任务处理成为系统主体，同时保留可信的 Agent 评估方法论内容。
 
 ## 已作出的决策
 
@@ -129,7 +139,7 @@ M1 在 Native Verify 阶段经历了 5 轮 Build/Verify 循环，产生了 83 �
 
 后续方向与阶段依赖见 [`docs/implementation/consolidation-roadmap.md`](docs/implementation/consolidation-roadmap.md)，以下是优先候选：
 
-1. **P0 真实 Provider 验收**：用受控 Credential 先运行 Adapter Smoke，再完成最小匹配 Pair 的 gRPC/Grading/Report 闭环。
+1. **P0 真实 Provider 评估矩阵**：在已完成单 Pair 控制面闭环的基础上，扩展多 Case/多 Repetition、强 Grader、真实 Worker Sandbox、Trigger/Security Probe 和成本/延迟审计。
 2. **P1 License 与 Secret 最小边界**：Secret/Redaction/Rotation Runbook 与 MIT `LICENSE` 已补齐；个人项目暂不接入 CI。
 3. **P2 MinIO/S3 Artifact Store**：建立 Store 抽象、LocalFS Adapter 与对象存储集成。
 4. **P3–P5 OTel、UI 浏览器 E2E 与完整 Event Stream**：按稳定的 Correlation、Artifact 和 API 契约依次推进。
