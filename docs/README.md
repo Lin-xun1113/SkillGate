@@ -55,7 +55,6 @@
 - **调研与证据：** `research/`。
 - **执行计划：** `implementation/`。
 - **运维手册：** `operations/`。
-- **作品集叙事：** `portfolio/`。
 
 如果两个文档发生冲突，不要自行选择。应先新增或更新 ADR，再更新规范性 Contract。
 

@@ -65,4 +65,7 @@ deploy/secrets/*-production*
 !/.comet/config.yaml
 # <<< Comet managed project state <<<
 
+# Personal career materials: resumes, interview notes, and demo scripts.
+# Kept on disk; not part of the public project.
 docs/personal/
+docs/portfolio/
